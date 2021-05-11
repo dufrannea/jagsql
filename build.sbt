@@ -8,6 +8,8 @@ ThisBuild / organizationName := "example"
 lazy val root = (project in file("."))
   .settings(
     name := "cata",
+    libraryDependencies += "org.typelevel" %% "cats-core" % "2.6.0",
+    libraryDependencies += "org.typelevel" %% "cats-parse" % "0.3.3",
     libraryDependencies += scalaTest % Test
   )
 
