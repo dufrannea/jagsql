@@ -2,3 +2,5 @@ target/
 .bloop
 .metals
 .vscode
+*.jar
+.bsp
