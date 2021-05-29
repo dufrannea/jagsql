@@ -1,26 +1,17 @@
 package duff
 
-import java.io.RandomAccessFile
-import java.nio.MappedByteBuffer
-import java.nio.channels.FileChannel
-import java.nio.charset.Charset
-import scala.util.matching.Regex
-import java.nio.charset.StandardCharsets
-import java.io.BufferedReader
-import java.io.File
-import java.nio.file.Paths
-import java.nio.channels.Channels
-import scala.collection.JavaConverters._
-import scala.concurrent.Future
-import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.Await
-import scala.concurrent.duration._
-import java.nio.file.Files
-import java.nio.file.Path
-import java.nio.file.FileVisitOption
-import java.util.regex.Pattern
 import cats.implicits._
 import com.monovore.decline._
+
+import java.io.BufferedReader
+import java.nio.channels.{Channels, FileChannel}
+import java.nio.charset.StandardCharsets
+import java.nio.file.{Files, Path, Paths}
+import scala.collection.immutable.ArraySeq
+import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.Future
+import scala.jdk.CollectionConverters._
+import scala.util.matching.Regex
 
 sealed trait SearchLocation
 case class Rec(directory: Path) extends SearchLocation
@@ -39,44 +30,47 @@ case class Args(
   * - gitignore support
   * - transtyping (get json output from unstructured file, maybe also parquet :) )
   * - support sql queries
-  * 
+  *
   * - find files that match several bool criteria
-  * - 
+  * -
   */
 object Main {
 
   def run(args: Args): Unit = {
 
-    val Args(regexp, location, ignoreCase, onlyMatch) = args
+    val Args(regexp, location, ignoreCase, _) = args
 
-    def searchBuffer(reader: BufferedReader, filePathPrefix: String) = {
-      val re = new Regex(s"(?i)$regexp")
+    def searchBuffer(reader: BufferedReader, filePathPrefix: String): Unit = {
+      val ignoreCasePrefix = if (ignoreCase) "(?i)" else ""
+      val re = new Regex(s"$ignoreCasePrefix$regexp")
 
       val grouping = 100
       val linesStream = reader.lines().iterator().asScala.grouped(grouping)
 
-      val results = linesStream.zipWithIndex.map {
+      val _ = linesStream.zipWithIndex.map {
         case (linesGroup, groupIndex) => {
-          linesGroup.zipWithIndex.map { case (line, lineIndex) =>
-            val lineNumber = groupIndex * grouping + lineIndex + 1
-            re.findFirstMatchIn(line).foreach { currentMatch =>
-              if (currentMatch.groupCount >= 1) {
-                println(
-                  s"$filePathPrefix${lineNumber.toString}: ${currentMatch.group(1)}"
-                )
-              } else {
-                val line =
-                  currentMatch.before.toString + Console.RED + currentMatch.matched.toString + Console.RESET + currentMatch.after
-                    .toString()
-                println(s"$filePathPrefix${lineNumber.toString}: $line")
+          linesGroup.zipWithIndex.map {
+            case (line, lineIndex) =>
+              val lineNumber = groupIndex * grouping + lineIndex + 1
+              re.findFirstMatchIn(line).foreach { currentMatch =>
+                if (currentMatch.groupCount >= 1) {
+                  println(
+                    s"$filePathPrefix${lineNumber.toString}: ${currentMatch.group(1)}"
+                  )
+                }
+                else {
+                  val line =
+                    currentMatch.before.toString + Console.RED + currentMatch.matched.toString + Console.RESET + currentMatch.after
+                      .toString()
+                  println(s"$filePathPrefix${lineNumber.toString}: $line")
+                }
               }
-            }
           }
 
         }
       }.toList
     }
-    def searchOneFile(filePath: Path, displayFileName: Boolean) = {
+    def searchOneFile(filePath: Path, displayFileName: Boolean): Unit = {
       val fc = FileChannel.open(filePath)
 
       try {
@@ -95,9 +89,8 @@ object Main {
       }
     }
 
-    def searchStdIn() = {
+    def searchStdIn(): Unit =
       searchBuffer(Console.in, "")
-    }
 
     location match {
       case Rec(directory) =>
@@ -129,41 +122,42 @@ object Main {
       Opts.flag("only-match", "didier", "o").orFalse
     ).tupled
       .validate("a path must be provided with --recursive") {
-        case (regex, recursive, ignoreCase, path, onlyMatch) =>
+        case (_, recursive, _, path, _) =>
           !recursive || path.isDefined
       }
-      .map { case (regex, recursive, ignoreCase, path, onlyMatch) =>
-        val location: SearchLocation = if (recursive) {
-          path
-            .map(k => Rec(Paths.get(k)))
-            .getOrElse(
-              sys.error("PANIC: Path is not defined, validation error")
-            )
-        } else if (path.isDefined) {
-          path
-            .map(k => Single(Paths.get(k)))
-            .getOrElse(
-              sys.error("PANIC: Path is not defined, validation error")
-            )
+      .map {
+        case (regex, recursive, ignoreCase, path, onlyMatch) =>
+          val location: SearchLocation = if (recursive) {
+            path
+              .map(k => Rec(Paths.get(k)))
+              .getOrElse(
+                sys.error("PANIC: Path is not defined, validation error")
+              )
+          }
+          else if (path.isDefined) {
+            path
+              .map(k => Single(Paths.get(k)))
+              .getOrElse(
+                sys.error("PANIC: Path is not defined, validation error")
+              )
 
-        } else {
-          StdIn
-        }
+          }
+          else {
+            StdIn
+          }
 
-        Args(regex, location, ignoreCase, onlyMatch)
+          Args(regex, location, ignoreCase, onlyMatch)
       }
 
     val command = Command("", "")(args)
 
-    command.parse(mainArgs) match {
+    command.parse(ArraySeq.unsafeWrapArray(mainArgs)) match {
       case Left(help) =>
         System.err.println(help)
         sys.exit(1)
       case Right(args) =>
         run(args)
     }
-
-    ()
 
   }
 }
