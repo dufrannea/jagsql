@@ -5,7 +5,7 @@ import duff.AST._
 import duff.SQLParser._
 import org.scalatest.freespec.AnyFreeSpec
 import org.scalatest.matchers.should.Matchers
-
+import cats.data.NonEmptyList
 import scala.language.postfixOps
 
 class SQLParserSpec extends AnyFreeSpec with Matchers {
@@ -59,13 +59,25 @@ class SQLParserSpec extends AnyFreeSpec with Matchers {
     "'salut'" ==> (LiteralExpression(StringLiteral("salut")): Expression)
     "1" ==> (LiteralExpression(NumberLiteral(BigDecimal("1"))): Expression)
     "/didier/" ==> (LiteralExpression(RegexLiteral("didier")): Expression)
-
-//    "SELECT 'salut'" ==>
   }
-//  "Statements" - {
-//    "SELECT" - {
-//      implicit val parser = selectStatement
-//      "SELECT 1" ==> ???
-//    }
-//  }
+
+  "Statements" - {
+    "SELECT" - {
+      implicit val parser = selectStatement
+
+      "SELECT" !!
+
+      "SELECT 1" ==> SelectStatement(
+        NonEmptyList.one(LiteralExpression(NumberLiteral(BigDecimal(1))))
+      ).asInstanceOf[Statement]
+
+      "SELECT 1, 'foo', /bar/" ==> SelectStatement(
+        NonEmptyList(
+          LiteralExpression(NumberLiteral(BigDecimal(1))),
+          LiteralExpression(StringLiteral("foo")) ::
+            LiteralExpression(RegexLiteral("bar")) :: Nil
+        )
+      ).asInstanceOf[Statement]
+    }
+  }
 }

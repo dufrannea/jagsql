@@ -1,5 +1,8 @@
 package duff
 
+import cats.data.NonEmptyList
+
+import java.nio.file.Path
 import scala.math.BigDecimal
 
 object AST {
@@ -7,6 +10,7 @@ object AST {
   case class StringLiteral(a: String) extends Literal
   case class NumberLiteral(a: BigDecimal) extends Literal
   case class RegexLiteral(str: String) extends Literal
+  case class FileLiteral(path: Path) extends Literal
 
   object Literal {
     def string(s: String): StringLiteral = StringLiteral(s)
@@ -17,5 +21,8 @@ object AST {
   sealed trait Expression
   case class LiteralExpression(literal: Literal) extends Expression
   case class FunctionCallExpression(name: String, arguments: Seq[Expression]) extends Expression
+
+  sealed trait Statement
+  case class SelectStatement(projections: NonEmptyList[Expression]) extends Statement
 
 }

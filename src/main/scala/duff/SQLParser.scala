@@ -10,6 +10,9 @@ import scala.util.{Failure, Success, Try}
 object SQLParser {
   import duff.AST._
 
+  private[this] val whitespace: Parser[Unit] = Parser.charIn(" \t\r\n").void
+  private[this] val w: Parser[Unit] = whitespace.rep.void
+
   case class Keyword(s: String)
 
   val parser: Parser[String] = Parser.anyChar.rep(10).map {
@@ -22,11 +25,11 @@ object SQLParser {
       .string(s)
       .map(_ => Keyword(s))
 
-  val SELECT = keyword("SELECT")
-  val FROM = keyword("FROM")
-  val WHERE = keyword("WHERE")
+  val SELECT: Parser[Keyword] = keyword("SELECT")
+  val FROM: Parser[Keyword] = keyword("FROM")
+  val WHERE: Parser[Keyword] = keyword("WHERE")
 
-  val star = Parser.char('*')
+  val star: Parser[Unit] = Parser.char('*')
 
   private val quoteChar = '\''
   val singleQuote: Parser[Unit] = Parser.char(quoteChar)
@@ -41,7 +44,7 @@ object SQLParser {
     .map(_.toList.mkString)
 
   val numberLiteral: Parser[NumberLiteral] = (integer ~ (Parser.char('.') *> integer).?)
-    .flatMap({
+    .flatMap {
       case (z, a) =>
         Try {
           BigDecimal(s"$z${a.map(ap => s".$ap").getOrElse("")}")
@@ -49,14 +52,14 @@ object SQLParser {
           case Failure(_)     => Parser.failWith(s"Not a number '$z.$a'")
           case Success(value) => Parser.pure(NumberLiteral(value))
         }
-    })
+    }
 
   private val forwardSlashChar = '/'
   val forwardSlashParser: Parser[Unit] = Parser.char(forwardSlashChar)
 
   val regexLiteral: Parser[RegexLiteral] =
     (forwardSlashParser *> Parser.charWhere(_ != forwardSlashChar).rep <* forwardSlashParser)
-      .flatMap(l => {
+      .flatMap { l =>
         Try {
           new Regex(l.toList.mkString)
           l.toList.mkString
@@ -64,7 +67,7 @@ object SQLParser {
           case Failure(_)     => Parser.failWith(s"Not a valid regex ${l.toString}")
           case Success(value) => Parser.pure(RegexLiteral(value))
         }
-      })
+      }
 
   val literal: Parser[Literal] = regexLiteral | stringLiteral | numberLiteral
 
@@ -80,11 +83,17 @@ object SQLParser {
     }
   })
 
-  val projection = literal
+  val projection: Parser[Expression] = expression
 
-  val selectStatement: Parser[Literal] = SELECT *> Parser
-    .char(' ')
-    .rep *> projection //(Parser.char(','))
+  val selectStatement: Parser[Statement] =
+    (SELECT *> w *> projection.repSep(1, Parser.char(',').surroundedBy(w.?)))
+      .map(AST.SelectStatement)
+
+//  val fileSource = keyword("FILE") *> Parser.char('(') *> w.? *> Parser.char(')')
+
+//  val fromClause = FROM *> (stdin |
+
+  val stdin = keyword("STDIN")
 
   // Arithmetic operations
   // Group expansion of regexes with several groups (or better syntax, maybe glob ? maybe cut ?)
