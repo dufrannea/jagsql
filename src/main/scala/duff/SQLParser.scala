@@ -3,12 +3,24 @@ package duff
 import cats.data.NonEmptyList
 import cats.parse.Parser
 
-import scala.math.BigDecimal
+import scala.math.{BigDecimal, exp}
 import scala.util.matching.Regex
 import scala.util.{Failure, Success, Try}
+import duff.AST._
+import Expression._
+import Statement._
+import cats.parse.Parser0
+
+// extension [A](p: Parser[A]) {
+//   // sequence parsers with whitespace
+//   def ~*[B](that: Parser0[B]): Parser[(A, B)] =
+//     Parser.product10(p, that)
+//   // discard sequence parsers with whitepace
+//   def *>*[B](that: Parser0[B]): Parser[B] =
+//     (p.void ~* that).map(_._2)
+// }
 
 object SQLParser {
-  import duff.AST._
 
   private[this] val whitespace: Parser[Unit] = Parser.charIn(" \t\r\n").void
   private[this] val w: Parser[Unit] = whitespace.rep.void
@@ -28,13 +40,17 @@ object SQLParser {
   val SELECT: Parser[Keyword] = keyword("SELECT")
   val FROM: Parser[Keyword] = keyword("FROM")
   val WHERE: Parser[Keyword] = keyword("WHERE")
+  val JOIN: Parser[Keyword] = keyword("JOIN")
+  val STDIN = keyword("STDIN")
+
+  val ON = keyword("ON")
 
   val star: Parser[Unit] = Parser.char('*')
 
   private val quoteChar = '\''
   val singleQuote: Parser[Unit] = Parser.char(quoteChar)
 
-  val stringLiteral: Parser[StringLiteral] =
+  val stringLiteral: Parser[Literal.StringLiteral] =
     (singleQuote *> Parser.charWhere(_ != quoteChar).rep0 <* singleQuote)
       .map(k => Literal.string(k.mkString))
 
@@ -43,57 +59,85 @@ object SQLParser {
     .rep
     .map(_.toList.mkString)
 
-  val numberLiteral: Parser[NumberLiteral] = (integer ~ (Parser.char('.') *> integer).?)
-    .flatMap {
-      case (z, a) =>
+  val numberLiteral: Parser[Literal.NumberLiteral] =
+    (integer ~ (Parser.char('.') *> integer).?)
+      .flatMap { case (z, a) =>
         Try {
           BigDecimal(s"$z${a.map(ap => s".$ap").getOrElse("")}")
         } match {
           case Failure(_)     => Parser.failWith(s"Not a number '$z.$a'")
-          case Success(value) => Parser.pure(NumberLiteral(value))
+          case Success(value) => Parser.pure(Literal.NumberLiteral(value))
         }
-    }
+      }
 
   private val forwardSlashChar = '/'
-  val forwardSlashParser: Parser[Unit] = Parser.char(forwardSlashChar)
+  private val forwardSlashParser: Parser[Unit] = Parser.char(forwardSlashChar)
 
-  val regexLiteral: Parser[RegexLiteral] =
-    (forwardSlashParser *> Parser.charWhere(_ != forwardSlashChar).rep <* forwardSlashParser)
+  val regexLiteral: Parser[Literal.RegexLiteral] =
+    (forwardSlashParser *> Parser
+      .charWhere(_ != forwardSlashChar)
+      .rep <* forwardSlashParser)
       .flatMap { l =>
         Try {
           new Regex(l.toList.mkString)
           l.toList.mkString
         } match {
-          case Failure(_)     => Parser.failWith(s"Not a valid regex ${l.toString}")
-          case Success(value) => Parser.pure(RegexLiteral(value))
+          case Failure(_) => Parser.failWith(s"Not a valid regex ${l.toString}")
+          case Success(value) => Parser.pure(Literal.RegexLiteral(value))
         }
       }
 
   val literal: Parser[Literal] = regexLiteral | stringLiteral | numberLiteral
 
   val identifier: Parser[String] =
-    Parser.charIn("abcdefghijklmnopqrstuvwxyz0123456789".toList).rep.map(_.toList.mkString)
+    Parser
+      .charIn("abcdefghijklmnopqrstuvwxyz0123456789".toList)
+      .rep
+      .map(_.toList.mkString)
 
   val expression: Parser[Expression] = Parser.recursive[Expression](recurse => {
-    val functionCall: Parser[(String, NonEmptyList[Expression])] = (identifier <* Parser
-      .char('(')) ~ (recurse.rep(1) <* Parser.char(')'))
+    val functionCall: Parser[(String, NonEmptyList[Expression])] =
+      (identifier <* Parser
+        .char('(')) ~ (recurse.rep(1) <* Parser.char(')'))
 
-    literal.map(LiteralExpression) | functionCall.map {
-      case (str, e) => FunctionCallExpression(str, e.toList)
-    }
+    literal.map(LiteralExpression) | functionCall.map { case (str, e) =>
+      FunctionCallExpression(str, e.toList)
+    } | recurse *> w.? *> Parser.charIn(List('=')) *> w.? *> recurse
   })
 
   val projection: Parser[Expression] = expression
 
+  val tableIdentifier: Parser[Source] =
+    STDIN.map(_ => Source.StdIn) | identifier.map(id => Source.TableRef(id))
+
+  val fromClause =
+    (FROM *> w *> (tableIdentifier <* w.?) ~ (JOIN *> w *> (tableIdentifier <* w.?) ~ (ON *> w *> expression))
+      .repSep0(0, w))
+      .map { case (source, others) =>
+        val tail = others.map { case (source, predicates) =>
+          FromItem(source, Some(predicates))
+        }
+        FromClause(
+          NonEmptyList(
+            FromItem(source, None),
+            tail
+          )
+        )
+      }
+
+  val whereClause = (WHERE *> w *> expression).map(e => WhereClause(e))
+
+  val selectWithProjections =
+    (SELECT *> w *> (projection <* w.?).repSep(1, Parser.char(',') <* w.?))
+      .map { case (first) =>
+        first
+      }
+
   val selectStatement: Parser[Statement] =
-    (SELECT *> w *> projection.repSep(1, Parser.char(',').surroundedBy(w.?)))
-      .map(AST.SelectStatement)
-
-//  val fileSource = keyword("FILE") *> Parser.char('(') *> w.? *> Parser.char(')')
-
-//  val fromClause = FROM *> (stdin |
-
-  val stdin = keyword("STDIN")
+    (selectWithProjections ~ fromClause.? ~ whereClause.?)
+      .map { case ((expressions, maybeFromClause), maybeWhereClause) =>
+        SelectStatement(expressions, maybeFromClause, maybeWhereClause)
+      }
 
   // Arithmetic operations
   // Group expansion of regexes with several groups (or better syntax, maybe glob ? maybe cut ?)
@@ -111,23 +155,5 @@ object SQLParser {
   // analyses regexes to understand the structure of the table
   def main(args: Array[String]): Unit =
     println(selectStatement.parse("SELECT /lol/"))
-
-  //
-//  class ParserOps[T](parser: Parser[T]) {
-//    def apply(thunk : => ()) = {
-//
-//    }
-//  }
-  // val literal = Parser.oneOf(stringLiteral :: intLiteral :: Nil).
-  // val chars = (0 until 25).map('a' + _).map(_.toChar)
-
-  // sealed trait Expression
-  // case class LiteralExpression(l: Literal)
-
-  // val expression = Parser.recursive(p => {
-
-  // })
-  // println(chars)
-  // println((singleQuote ~ Parser.ignoreCaseCharIn(chars).rep ~ singleQuote).parse("'ab'"))
 
 }
