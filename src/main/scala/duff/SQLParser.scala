@@ -2,11 +2,12 @@ package duff
 
 import cats.data.NonEmptyList
 import cats.parse.Parser
+import cats.implicits._
 
 import scala.math.{BigDecimal, exp}
 import scala.util.matching.Regex
 import scala.util.{Failure, Success, Try}
-import duff.AST._
+import duff.CST._
 import Expression._
 import Statement._
 import cats.parse.Parser0
@@ -100,10 +101,58 @@ object SQLParser {
       (identifier <* Parser
         .char('(')) ~ (recurse.rep(1) <* Parser.char(')'))
 
-    literal.map(LiteralExpression) | functionCall.map { case (str, e) =>
+    literal.map(LiteralExpression.apply) | functionCall.map { case (str, e) =>
       FunctionCallExpression(str, e.toList)
-    } | recurse *> w.? *> Parser.charIn(List('=')) *> w.? *> recurse
+    }
   })
+
+  val ops = List(
+    ("=", BinaryOperator.Equal),
+    ("!=", BinaryOperator.Different),
+    (
+      ">=",
+      BinaryOperator.MoreEqual
+    ),
+    (
+      "<=",
+      BinaryOperator.LessEqual
+    ),
+    (
+      ">",
+      BinaryOperator.More
+    ),
+    (
+      "<",
+      BinaryOperator.Less
+    ),
+    (
+      "+",
+      BinaryOperator.Plus
+    ),
+    (
+      "-",
+      BinaryOperator.Minus
+    ),
+    (
+      "*",
+      BinaryOperator.Times
+    ),
+    (
+      "/",
+      BinaryOperator.Divided
+    )
+  )
+  val binaryOperator = Parser.oneOf(ops.map { case (s, op) =>
+    Parser.string(s).map(_ => op)
+  })
+
+  val start: Parser[Expression] = (expression <* w.?)
+  val end = ((binaryOperator <* w) ~ expression).?
+  val binaryExpression = (start ~ end).map {
+    case (left, None) => left
+    case (left, Some((op, right))) =>
+      Binary(left, right, Operator.B(op))
+  }
 
   val projection: Parser[Expression] = expression
 
@@ -133,6 +182,7 @@ object SQLParser {
         first
       }
 
+  // TODO: can we support only where without FROM ?
   val selectStatement: Parser[Statement] =
     (selectWithProjections ~ (fromClause.?) ~ whereClause.?)
       .map { case ((expressions, maybeFromClause), maybeWhereClause) =>

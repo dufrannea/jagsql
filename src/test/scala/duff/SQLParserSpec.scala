@@ -2,11 +2,11 @@ package duff
 
 import cats.data.NonEmptyList
 import cats.parse.Parser
-import duff.AST._
-import duff.AST.Expression._
-import duff.AST.Literal._
-import duff.AST.Statement._
-import duff.AST.Source._
+import duff.CST._
+import duff.CST.Expression._
+import duff.CST.Literal._
+import duff.CST.Statement._
+import duff.CST.Source._
 import duff.SQLParser._
 import org.scalatest.freespec.AnyFreeSpec
 import org.scalatest.matchers.should.Matchers
@@ -72,8 +72,30 @@ class SQLParserSpec extends AnyFreeSpec with Matchers {
     "'salut'" parsesTo (LiteralExpression(StringLiteral("salut")): Expression)
     "1" parsesTo (LiteralExpression(NumberLiteral(BigDecimal("1"))): Expression)
     "/didier/" parsesTo (LiteralExpression(RegexLiteral("didier")): Expression)
+
+    "didier(1)" parsesTo (FunctionCallExpression(
+      "didier",
+      List(LiteralExpression(NumberLiteral(1)))
+    ): Expression)
   }
   val one = LiteralExpression(NumberLiteral(BigDecimal(1)))
+
+  "BinaryExpression" - {
+    implicit val parser = binaryExpression
+    "'salut'" parsesTo (LiteralExpression(StringLiteral("salut")): Expression)
+    "1" parsesTo (LiteralExpression(NumberLiteral(BigDecimal("1"))): Expression)
+
+    "1 = 1" parsesTo (Binary(one, one, Operator.B(BinaryOperator.Equal)))
+    "1 != 1" parsesTo (Binary(one, one, Operator.B(BinaryOperator.Different)))
+    "1 <= 1" parsesTo (Binary(one, one, Operator.B(BinaryOperator.LessEqual)))
+    "1 >= 1" parsesTo (Binary(one, one, Operator.B(BinaryOperator.MoreEqual)))
+    "1 < 1" parsesTo (Binary(one, one, Operator.B(BinaryOperator.Less)))
+    "1 > 1" parsesTo (Binary(one, one, Operator.B(BinaryOperator.More)))
+    "1 + 1" parsesTo (Binary(one, one, Operator.B(BinaryOperator.Plus)))
+    "1 - 1" parsesTo (Binary(one, one, Operator.B(BinaryOperator.Minus)))
+    "1 / 1" parsesTo (Binary(one, one, Operator.B(BinaryOperator.Divided)))
+    "1 * 1" parsesTo (Binary(one, one, Operator.B(BinaryOperator.Times)))
+  }
 
   "Statements" - {
     "SELECT" - {

@@ -1,6 +1,6 @@
 package duff
 
-import duff.AST
+import duff.CST
 //import fs2._
 import cats.effect._
 

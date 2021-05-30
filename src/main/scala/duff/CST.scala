@@ -2,17 +2,17 @@ package duff
 
 import cats.data
 import cats.data.NonEmptyList
-import duff.AST.Literal.{NumberLiteral, RegexLiteral, StringLiteral}
+import duff.CST.Literal.{NumberLiteral, RegexLiteral, StringLiteral}
 
 import java.nio.file.Path
 import scala.math.BigDecimal
-import duff.AST.FromItem
-import duff.AST.FromClause
-import duff.AST.Expression
-import duff.AST.WhereClause
-import duff.AST.Source
+import duff.CST.FromItem
+import duff.CST.FromClause
+import duff.CST.Expression
+import duff.CST.WhereClause
+import duff.CST.Source
 
-object AST {
+object CST {
   enum Literal {
     case StringLiteral(a: String)
     case NumberLiteral(a: BigDecimal)
@@ -26,10 +26,8 @@ object AST {
     def regex(s: String): RegexLiteral = RegexLiteral(s)
   }
 
-
-  // Supported operators
   enum BinaryOperator {
-    case Equal, Different, Less, More, LessEqual, MoreEqual
+    case Equal, Different, Less, More, LessEqual, MoreEqual, Plus, Minus, Times, Divided
   }
   enum UnaryOperator {
     case Not
@@ -43,36 +41,37 @@ object AST {
     case LiteralExpression(literal: Literal)
     case FunctionCallExpression(name: String, arguments: Seq[Expression])
     case Binary(left: Expression, right: Expression, operator: Operator)
-    // boolean expression necessarily, or coercible to boolean (but we don't like that)
     case Unary(expression: Expression)
+  }
+
+  enum ExpressionF[K] {
+    case LiteralExpression(literal: Literal)
+    case FunctionCallExpression(name: String, arguments: Seq[K])
+    case Binary(left: K, right: K, operator: Operator)
+    case Unary(expression: K)
+  }
+
+  object ExpressionF {
+    import cats.Functor
+
+    given Functor[ExpressionF] with
+      def map[A, B](fa: ExpressionF[A])(f: A => B): ExpressionF[B] = fa match {
+        case FunctionCallExpression(name, args) => FunctionCallExpression(name, args.map(f))
+        case Binary(left, right, operator) => Binary(f(left), f(right), operator)
+        case Unary(e) => Unary(f(e))
+        case LiteralExpression(literal) => LiteralExpression(literal)
+      }
   }
 
   enum Source {
     case StdIn
     case TableRef(identifier: String)
   }
-
   
   case class FromItem(source: Source, joinPredicates: Option[Expression])
   case class FromClause(items: NonEmptyList[FromItem])
-  // object FromClause {
-  //   def empty = FromClause(NonEmptyList)
-  // }
 
   case class WhereClause(expression: Expression)
-
-  // enum FromItem {
-  //   case First(name: String)
-  //   case Other(name: String, predicates: List[Expression])
-  // }
-
-  // enum FromClause {
-  //   case Empty
-  //   case Single(s: FromItem.First)
-  //   case Multiple(s: FromItem.First, others: data.NonEmptyList[FromItem.Other])
-  // }
-
-  // case class Join(what: String, predicates: List[Expression], others: List[(String, List[Expression])])
 
   enum Statement {
     case SelectStatement(
