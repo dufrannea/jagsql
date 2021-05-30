@@ -145,5 +145,15 @@ class SQLParserSpec extends AnyFreeSpec with Matchers {
       "FROM didier JOIN tata ON 1 JOIN toto" fails
 
     }
+
+    "WHERE" - {
+      implicit val parser = selectStatement
+
+      "SELECT 1 FROM didier WHERE" fails
+
+      "SELECT 1 FROM didier WHERE 1" parses
+
+      "SELECT 1 FROM didier JOIN tata ON 1 WHERE 2" parses
+    }
   }
 }

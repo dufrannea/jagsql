@@ -111,8 +111,8 @@ object SQLParser {
     STDIN.map(_ => Source.StdIn) | identifier.map(id => Source.TableRef(id))
 
   val fromClause =
-    (FROM *> w *> (tableIdentifier <* w.?) ~ (JOIN *> w *> (tableIdentifier <* w.?) ~ (ON *> w *> expression))
-      .repSep0(0, w))
+    ((FROM *> w *> (tableIdentifier <* w.?) ~ (JOIN *> w *> (tableIdentifier <* w.?) ~ (ON *> w *> expression))
+      .repSep0(0, w)) <* w.?)
       .map { case (source, others) =>
         val tail = others.map { case (source, predicates) =>
           FromItem(source, Some(predicates))
@@ -134,7 +134,7 @@ object SQLParser {
       }
 
   val selectStatement: Parser[Statement] =
-    (selectWithProjections ~ fromClause.? ~ whereClause.?)
+    (selectWithProjections ~ (fromClause.?) ~ whereClause.?)
       .map { case ((expressions, maybeFromClause), maybeWhereClause) =>
         SelectStatement(expressions, maybeFromClause, maybeWhereClause)
       }
