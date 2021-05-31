@@ -4,9 +4,12 @@ import cats.implicits._
 import com.monovore.decline._
 
 import java.io.BufferedReader
-import java.nio.channels.{Channels, FileChannel}
+import java.nio.channels.Channels
+import java.nio.channels.FileChannel
 import java.nio.charset.StandardCharsets
-import java.nio.file.{Files, Path, Paths}
+import java.nio.file.Files
+import java.nio.file.Path
+import java.nio.file.Paths
 import scala.collection.immutable.ArraySeq
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
@@ -19,19 +22,19 @@ case class Single(path: Path) extends SearchLocation
 case object StdIn extends SearchLocation
 
 case class Args(
-    regex: String,
-    searchLocation: SearchLocation,
-    ignoreCase: Boolean,
-    onlyMatch: Boolean
+  regex: String,
+  searchLocation: SearchLocation,
+  ignoreCase: Boolean,
+  onlyMatch: Boolean
 )
 
 /** TODO:
-  * - Use memory mapped files to maybe get a speedup
-  * - gitignore support
-  * - transtyping (get json output from unstructured file, maybe also parquet :) )
-  * - support sql queries
+  *   - Use memory mapped files to maybe get a speedup
+  *   - gitignore support
+  *   - transtyping (get json output from unstructured file, maybe also parquet :) )
+  *   - support sql queries
   *
-  * - find files that match several bool criteria
+  *   - find files that match several bool criteria
   * -
   */
 object Main {
@@ -47,28 +50,28 @@ object Main {
       val grouping = 100
       val linesStream = reader.lines().iterator().asScala.grouped(grouping)
 
-      val _ = linesStream.zipWithIndex.map {
-        case (linesGroup, groupIndex) => {
-          linesGroup.zipWithIndex.map {
-            case (line, lineIndex) =>
-              val lineNumber = groupIndex * grouping + lineIndex + 1
-              re.findFirstMatchIn(line).foreach { currentMatch =>
-                if (currentMatch.groupCount >= 1) {
-                  println(
-                    s"$filePathPrefix${lineNumber.toString}: ${currentMatch.group(1)}"
-                  )
-                }
-                else {
-                  val line =
-                    currentMatch.before.toString + Console.RED + currentMatch.matched.toString + Console.RESET + currentMatch.after
-                      .toString()
-                  println(s"$filePathPrefix${lineNumber.toString}: $line")
-                }
+      val _ = linesStream
+        .zipWithIndex
+        .map { case (linesGroup, groupIndex) =>
+          linesGroup.zipWithIndex.map { case (line, lineIndex) =>
+            val lineNumber = groupIndex * grouping + lineIndex + 1
+            re.findFirstMatchIn(line).foreach { currentMatch =>
+              if (currentMatch.groupCount >= 1) {
+                println(
+                  s"$filePathPrefix${lineNumber.toString}: ${currentMatch.group(1)}"
+                )
+              } else {
+                val line =
+                  currentMatch.before.toString + Console.RED + currentMatch.matched.toString + Console.RESET + currentMatch
+                    .after
+                    .toString()
+                println(s"$filePathPrefix${lineNumber.toString}: $line")
               }
+            }
           }
 
         }
-      }.toList
+        .toList
     }
     def searchOneFile(filePath: Path, displayFileName: Boolean): Unit = {
       val fc = FileChannel.open(filePath)
@@ -84,9 +87,7 @@ object Main {
           if (displayFileName) s"${filePath.toString()} - " else ""
         )
 
-      } finally {
-        if (fc != null) fc.close()
-      }
+      } finally if (fc != null) fc.close()
     }
 
     def searchStdIn(): Unit =
@@ -100,11 +101,11 @@ object Main {
           .asScala
           .filter(_.toFile.isFile())
           .map { file =>
-            Future { searchOneFile(file, true) }
+            Future(searchOneFile(file, true))
           }
         searches.foreach(_ => ())
-      case Single(path) => searchOneFile(path, false)
-      case StdIn        => searchStdIn()
+      case Single(path)   => searchOneFile(path, false)
+      case StdIn          => searchStdIn()
     }
 
   }
@@ -121,38 +122,34 @@ object Main {
       Opts.argument[String]("file").orNone,
       Opts.flag("only-match", "didier", "o").orFalse
     ).tupled
-      .validate("a path must be provided with --recursive") {
-        case (_, recursive, _, path, _) =>
-          !recursive || path.isDefined
+      .validate("a path must be provided with --recursive") { case (_, recursive, _, path, _) =>
+        !recursive || path.isDefined
       }
-      .map {
-        case (regex, recursive, ignoreCase, path, onlyMatch) =>
-          val location: SearchLocation = if (recursive) {
-            path
-              .map(k => Rec(Paths.get(k)))
-              .getOrElse(
-                sys.error("PANIC: Path is not defined, validation error")
-              )
-          }
-          else if (path.isDefined) {
-            path
-              .map(k => Single(Paths.get(k)))
-              .getOrElse(
-                sys.error("PANIC: Path is not defined, validation error")
-              )
+      .map { case (regex, recursive, ignoreCase, path, onlyMatch) =>
+        val location: SearchLocation = if (recursive) {
+          path
+            .map(k => Rec(Paths.get(k)))
+            .getOrElse(
+              sys.error("PANIC: Path is not defined, validation error")
+            )
+        } else if (path.isDefined) {
+          path
+            .map(k => Single(Paths.get(k)))
+            .getOrElse(
+              sys.error("PANIC: Path is not defined, validation error")
+            )
 
-          }
-          else {
-            StdIn
-          }
+        } else {
+          StdIn
+        }
 
-          Args(regex, location, ignoreCase, onlyMatch)
+        Args(regex, location, ignoreCase, onlyMatch)
       }
 
     val command = Command("", "")(args)
 
     command.parse(ArraySeq.unsafeWrapArray(mainArgs)) match {
-      case Left(help) =>
+      case Left(help)  =>
         System.err.println(help)
         sys.exit(1)
       case Right(args) =>
@@ -160,6 +157,7 @@ object Main {
     }
 
   }
+
 }
 
 //   def lol() = {

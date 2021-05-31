@@ -40,6 +40,7 @@ class SQLParserSpec extends AnyFreeSpec with Matchers {
           case Right((_, value)) => fail(s"Expected failure got $value")
         }
       }
+
   }
 
   "Literals" - {

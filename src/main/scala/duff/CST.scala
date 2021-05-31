@@ -2,7 +2,9 @@ package duff
 
 import cats.data
 import cats.data.NonEmptyList
-import duff.CST.Literal.{NumberLiteral, RegexLiteral, StringLiteral}
+import duff.CST.Literal.NumberLiteral
+import duff.CST.Literal.RegexLiteral
+import duff.CST.Literal.StringLiteral
 
 import java.nio.file.Path
 import scala.math.BigDecimal
@@ -13,6 +15,7 @@ import duff.CST.WhereClause
 import duff.CST.Source
 
 object CST {
+
   enum Literal {
     case StringLiteral(a: String)
     case NumberLiteral(a: BigDecimal)
@@ -29,9 +32,11 @@ object CST {
   enum BinaryOperator {
     case Equal, Different, Less, More, LessEqual, MoreEqual, Plus, Minus, Times, Divided
   }
+
   enum UnaryOperator {
     case Not
   }
+
   enum Operator {
     case B(op: BinaryOperator)
     case U(op: UnaryOperator)
@@ -44,40 +49,24 @@ object CST {
     case Unary(expression: Expression)
   }
 
-  enum ExpressionF[K] {
-    case LiteralExpression(literal: Literal)
-    case FunctionCallExpression(name: String, arguments: Seq[K])
-    case Binary(left: K, right: K, operator: Operator)
-    case Unary(expression: K)
-  }
-
-  object ExpressionF {
-    import cats.Functor
-
-    given Functor[ExpressionF] with
-      def map[A, B](fa: ExpressionF[A])(f: A => B): ExpressionF[B] = fa match {
-        case FunctionCallExpression(name, args) => FunctionCallExpression(name, args.map(f))
-        case Binary(left, right, operator) => Binary(f(left), f(right), operator)
-        case Unary(e) => Unary(f(e))
-        case LiteralExpression(literal) => LiteralExpression(literal)
-      }
-  }
-
   enum Source {
     case StdIn
     case TableRef(identifier: String)
   }
-  
+
   case class FromItem(source: Source, joinPredicates: Option[Expression])
   case class FromClause(items: NonEmptyList[FromItem])
 
   case class WhereClause(expression: Expression)
 
   enum Statement {
+
     case SelectStatement(
       projections: NonEmptyList[Expression],
       fromClause: Option[FromClause] = None,
-      whereClause: Option[WhereClause] = None)
+      whereClause: Option[WhereClause] = None
+    )
+
   }
 
 }

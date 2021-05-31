@@ -4,22 +4,16 @@ import cats.data.NonEmptyList
 import cats.parse.Parser
 import cats.implicits._
 
-import scala.math.{BigDecimal, exp}
+import scala.math.BigDecimal
+import scala.math.exp
 import scala.util.matching.Regex
-import scala.util.{Failure, Success, Try}
+import scala.util.Failure
+import scala.util.Success
+import scala.util.Try
 import duff.CST._
 import Expression._
 import Statement._
 import cats.parse.Parser0
-
-// extension [A](p: Parser[A]) {
-//   // sequence parsers with whitespace
-//   def ~*[B](that: Parser0[B]): Parser[(A, B)] =
-//     Parser.product10(p, that)
-//   // discard sequence parsers with whitepace
-//   def *>*[B](that: Parser0[B]): Parser[B] =
-//     (p.void ~* that).map(_._2)
-// }
 
 object SQLParser {
 
@@ -83,7 +77,7 @@ object SQLParser {
           new Regex(l.toList.mkString)
           l.toList.mkString
         } match {
-          case Failure(_) => Parser.failWith(s"Not a valid regex ${l.toString}")
+          case Failure(_)     => Parser.failWith(s"Not a valid regex ${l.toString}")
           case Success(value) => Parser.pure(Literal.RegexLiteral(value))
         }
       }
@@ -96,7 +90,7 @@ object SQLParser {
       .rep
       .map(_.toList.mkString)
 
-  val expression: Parser[Expression] = Parser.recursive[Expression](recurse => {
+  val expression: Parser[Expression] = Parser.recursive[Expression] { recurse =>
     val functionCall: Parser[(String, NonEmptyList[Expression])] =
       (identifier <* Parser
         .char('(')) ~ (recurse.rep(1) <* Parser.char(')'))
@@ -104,7 +98,7 @@ object SQLParser {
     literal.map(LiteralExpression.apply) | functionCall.map { case (str, e) =>
       FunctionCallExpression(str, e.toList)
     }
-  })
+  }
 
   val ops = List(
     ("=", BinaryOperator.Equal),
@@ -142,14 +136,16 @@ object SQLParser {
       BinaryOperator.Divided
     )
   )
+
   val binaryOperator = Parser.oneOf(ops.map { case (s, op) =>
     Parser.string(s).map(_ => op)
   })
 
-  val start: Parser[Expression] = (expression <* w.?)
+  val start: Parser[Expression] = expression <* w.?
   val end = ((binaryOperator <* w) ~ expression).?
+
   val binaryExpression = (start ~ end).map {
-    case (left, None) => left
+    case (left, None)              => left
     case (left, Some((op, right))) =>
       Binary(left, right, Operator.B(op))
   }
