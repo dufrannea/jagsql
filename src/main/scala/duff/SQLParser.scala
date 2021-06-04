@@ -65,6 +65,10 @@ object SQLParser {
         }
       }
 
+  val boolLiteral: Parser[Literal] = Parser.string("true").map(_ => Literal.BoolLiteral(true)) | Parser
+    .string("false")
+    .map(_ => Literal.BoolLiteral(false))
+
   private val forwardSlashChar = '/'
   private val forwardSlashParser: Parser[Unit] = Parser.char(forwardSlashChar)
 
@@ -82,7 +86,7 @@ object SQLParser {
         }
       }
 
-  val literal: Parser[Literal] = regexLiteral | stringLiteral | numberLiteral
+  val literal: Parser[Literal] = regexLiteral | stringLiteral | numberLiteral | boolLiteral
 
   val identifier: Parser[String] =
     Parser

@@ -6,10 +6,13 @@ import cats.implicits._
 
 import scala.language.experimental
 import scala.util.Try
+import duff.cst.Operator
 
 enum SimpleType {
   case Number
   case String
+  case Bool
+
 }
 
 enum Type {
@@ -17,11 +20,16 @@ enum Type {
   case Any
 }
 
+object Type {
+  val Number = Type.Simple(SimpleType.Number)
+  val String = Type.Simple(SimpleType.String)
+  val Bool = Type.Simple(SimpleType.Bool)
+}
+
 import Type._
-import SimpleType._
 
 enum Function(val args: List[Type], val returnType: Type) {
-  case file extends Function(Simple(String) :: Nil, Simple(String))
+  case file extends Function(Type.String :: Nil, Type.String)
 }
 
 enum ExpressionF[K] {
@@ -56,9 +64,10 @@ def analyzeExpression(e: cst.Expression): Either[String, Fix[ExpressionF]] = e m
     val expressionType = l match {
       // TODO: actually depending on the regex literal we can either
       // return an array or a string, that is the goal of it :)
-      case cst.Literal.RegexLiteral(_)  => Type.Simple(SimpleType.String)
-      case cst.Literal.StringLiteral(_) => Type.Simple(SimpleType.String)
-      case cst.Literal.NumberLiteral(_) => Type.Simple(SimpleType.Number)
+      case cst.Literal.RegexLiteral(_)  => Type.String
+      case cst.Literal.StringLiteral(_) => Type.String
+      case cst.Literal.NumberLiteral(_) => Type.Number
+      case cst.Literal.BoolLiteral(_)   => Type.Bool
     }
 
     Right(Fix(ExpressionF.LiteralExpression(l, expressionType)))
@@ -81,11 +90,30 @@ def analyzeExpression(e: cst.Expression): Either[String, Fix[ExpressionF]] = e m
 
   case cst.Expression.Binary(left, right, operator) =>
     for {
-      leftA  <- analyzeExpression(left)
-      rightA <- analyzeExpression(right)
-      _      <- if (leftA.unfix.expressionType == rightA.unfix.expressionType) Either.unit else "wrongtypes".asLeft
-    } yield Fix(ExpressionF.Binary(leftA, rightA, operator, leftA.unfix.expressionType))
-  // ExpressionF.LiteralExpression(left, right, operator)
+      leftA      <- analyzeExpression(left)
+      rightA     <- analyzeExpression(right)
+      leftType = leftA.unfix.expressionType
+      rightType = rightA.unfix.expressionType
+      commonType <- if (leftType == rightType) Either.right(leftA.unfix.expressionType)
+                    else
+                      s"Types on the LHS and RHS should be the same for operator ${operator.toString}, here found ${leftType.toString} and ${rightType.toString}".asLeft
+      resultType <- (commonType, operator) match {
+                      // Equality is valid for every type
+                      case (_, Operator.Equal) | (_, Operator.Different) =>
+                        Either.right(Type.Bool)
+                      // Int specific comparisons
+                      case (Type.Number, o)
+                          if o == Operator.Less || o == Operator.More || o == Operator.LessEqual || o == Operator.MoreEqual =>
+                        Either.right(Type.Bool)
+                      // Int specific operations
+                      case (Type.Number, o)
+                          if o == Operator.Plus || o == Operator.Minus || o == Operator.Divided || o == Operator.Times =>
+                        Either.right(Type.Number)
+                      // Only string operator is concatenation
+                      case (Type.String, Operator.Plus)                  => Either.right(Type.String)
+                      case _ => s"Operator ${operator.toString} cannot be used with type ${leftType.toString}".asLeft
+                    }
+    } yield Fix(ExpressionF.Binary(leftA, rightA, operator, resultType))
 
   case cst.Expression.Unary(e) => sys.error("not yet implemented")
 }

@@ -50,14 +50,14 @@ class SQLParserSpec extends AnyFreeSpec with Matchers {
 
   "Literals" - {
     "StringLiteral" - {
-      implicit val parser = stringLiteral
+      implicit val parser = literal
 
       "'didier'" parsesTo StringLiteral("didier")
       "''" parsesTo StringLiteral("")
     }
 
     "NumberLiteral" - {
-      implicit val parser = numberLiteral
+      implicit val parser = literal
 
       "10" parsesTo NumberLiteral(BigDecimal(10))
       "0.1" parsesTo NumberLiteral(BigDecimal("0.1"))
@@ -65,10 +65,17 @@ class SQLParserSpec extends AnyFreeSpec with Matchers {
     }
 
     "RegexLiteral" - {
-      implicit val parser = regexLiteral
+      implicit val parser = literal
 
       "/abcd/" parsesTo RegexLiteral("abcd")
       "/(a)/" parsesTo RegexLiteral("(a)")
+    }
+
+    "BoolLiteral" - {
+      implicit val parser = literal
+
+      "true" parsesTo BoolLiteral(true)
+      "false" parsesTo BoolLiteral(false)
     }
   }
 
@@ -225,7 +232,7 @@ class SQLParserSpec extends AnyFreeSpec with Matchers {
     }
 
     "JOIN" - {
-      implicit val parser = joinClausea
+      implicit val parser = joinClause
 
       "JOIN tata ON 2" parses
 

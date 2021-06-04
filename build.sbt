@@ -17,5 +17,15 @@ lazy val root = project
       .cross(CrossVersion.for3Use2_13),
     libraryDependencies += scalaTest % Test,
     libraryDependencies += "org.scalatest" %% "scalatest-freespec" % "3.2.9" % Test,
-    libraryDependencies += "com.novocode" % "junit-interface" % "0.11" % "test"
+    libraryDependencies += "com.novocode" % "junit-interface" % "0.11" % "test",
+    scalacOptions ++= Seq(
+      "-deprecation", // Emit warning and location for usages of deprecated APIs.
+      "-encoding",
+      "utf-8", // Specify character encoding used by source files.
+      "-feature", // Emit warning and location for usages of features that should be imported explicitly.
+      "-language:existentials", // Existential types (besides wildcard types) can be written and inferred
+      "-language:higherKinds", // Allow higher-kinded types
+      "-unchecked", // Enable additional warnings where generated code depends on assumptions.
+      "-Xfatal-warnings" // Fail the compilation if there are any warnings.
+    )
   )
