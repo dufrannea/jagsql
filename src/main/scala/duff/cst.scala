@@ -63,7 +63,7 @@ enum Source {
   case TableRef(identifier: String)
 }
 
-case class FromItem(source: Source, joinPredicates: Option[Expression])
+case class FromItem(source: Source, maybeJoinPredicates: Option[Expression])
 case class FromClause(items: NonEmptyList[FromItem])
 
 case class WhereClause(expression: Expression)

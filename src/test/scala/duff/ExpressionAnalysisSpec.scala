@@ -93,9 +93,9 @@ class ExpressionAnalysisSpec extends AnalysisDsl:
 
     "true - false" fails
 
-    "true && false" succeeds
+    "true && false" hasType Type.Bool
 
-    "true || false" succeeds
+    "true || false" hasType Type.Bool
 
   }
 

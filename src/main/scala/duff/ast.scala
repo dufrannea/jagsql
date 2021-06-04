@@ -3,6 +3,7 @@ package ast
 
 import cats._
 import cats.implicits._
+import cats.data.NonEmptyList
 
 import scala.language.experimental
 import scala.util.Try
@@ -58,6 +59,23 @@ object ExpressionF {
 case class Fix[F[_]](val unfix: F[Fix[F]])
 
 type Expression = Fix[ExpressionF]
+
+/** Statements
+  */
+case class FromItem(source: cst.Source, joinPredicates: Option[Expression])
+case class FromClause(items: NonEmptyList[FromItem])
+case class WhereClause(expression: Expression)
+
+enum Statement {
+  import cats.data.NonEmptyList
+
+  case SelectStatement(
+    projections: NonEmptyList[Expression],
+    fromClause: FromClause,
+    whereClause: Option[WhereClause] = None
+  )
+
+}
 
 def analyzeExpression(e: cst.Expression): Either[String, Fix[ExpressionF]] = e match {
   case cst.Expression.LiteralExpression(l)                    =>
@@ -118,3 +136,27 @@ def analyzeExpression(e: cst.Expression): Either[String, Fix[ExpressionF]] = e m
 
   case cst.Expression.Unary(e) => sys.error("not yet implemented")
 }
+
+def analyzeStatement(s: cst.Statement): Either[String, Statement] =
+  s match {
+    case cst.Statement.SelectStatement(projections, from, maybeWhere) =>
+      for {
+        analyzedFrom        <- from match {
+                                 case None    => FromClause(NonEmptyList.one(FromItem(cst.Source.StdIn, None))).asRight
+                                 case Some(f) =>
+                                   for {
+                                     analyzedItems <-
+                                       f.items
+                                         .traverse(fromItem =>
+                                           fromItem
+                                             .maybeJoinPredicates
+                                             .traverse(e => analyzeExpression(e))
+                                             .map(e => FromItem(fromItem.source, e))
+                                         )
+                                   } yield FromClause(analyzedItems)
+
+                               }
+        analyzedProjections <- projections.traverse(analyzeExpression)
+        analyzedWhere <- maybeWhere.traverse(where => analyzeExpression(where.expression).map(k => WhereClause(k)))
+      } yield Statement.SelectStatement(analyzedProjections, analyzedFrom, analyzedWhere)
+  }
