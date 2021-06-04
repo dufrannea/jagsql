@@ -99,7 +99,7 @@ def analyzeExpression(e: cst.Expression): Either[String, Fix[ExpressionF]] = e m
                       s"Types on the LHS and RHS should be the same for operator ${operator.toString}, here found ${leftType.toString} and ${rightType.toString}".asLeft
       resultType <- (commonType, operator) match {
                       // Equality is valid for every type
-                      case (_, Operator.Equal) | (_, Operator.Different) =>
+                      case (_, Operator.Equal) | (_, Operator.Different)           =>
                         Either.right(Type.Bool)
                       // Int specific comparisons
                       case (Type.Number, o)
@@ -110,7 +110,8 @@ def analyzeExpression(e: cst.Expression): Either[String, Fix[ExpressionF]] = e m
                           if o == Operator.Plus || o == Operator.Minus || o == Operator.Divided || o == Operator.Times =>
                         Either.right(Type.Number)
                       // Only string operator is concatenation
-                      case (Type.String, Operator.Plus)                  => Either.right(Type.String)
+                      case (Type.String, Operator.Plus)                            => Either.right(Type.String)
+                      case (Type.Bool, o) if o == Operator.And || o == Operator.Or => Either.right(Type.Bool)
                       case _ => s"Operator ${operator.toString} cannot be used with type ${leftType.toString}".asLeft
                     }
     } yield Fix(ExpressionF.Binary(leftA, rightA, operator, resultType))

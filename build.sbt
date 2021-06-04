@@ -18,6 +18,7 @@ lazy val root = project
     libraryDependencies += scalaTest % Test,
     libraryDependencies += "org.scalatest" %% "scalatest-freespec" % "3.2.9" % Test,
     libraryDependencies += "com.novocode" % "junit-interface" % "0.11" % "test",
+    test / envVars := Map("SCALACTIC_FILL_FILE_PATHNAMES" -> "yes"),
     scalacOptions ++= Seq(
       "-deprecation", // Emit warning and location for usages of deprecated APIs.
       "-encoding",

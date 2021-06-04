@@ -13,40 +13,7 @@ import org.scalatest.matchers.should.Matchers
 
 import scala.language.postfixOps
 
-class SQLParserSpec extends AnyFreeSpec with Matchers {
-
-  implicit class TestWrapper[T](l: String) {
-
-    def parsesTo[K >: T](result: T)(implicit p: Parser[K]): Unit =
-      s"$l" in {
-        p.parseAll(l) match {
-          case Left(e)      => fail(e.toString)
-          case Right(value) => val _ = assert(value === result)
-        }
-      }
-
-    def formatError(e: Parser.Error): String = e match {
-      case Parser.Error(pos, _) =>
-        (1 to pos).map(_ => " ").mkString + "^"
-    }
-
-    def parses(implicit p: Parser[_]): Unit =
-      s"$l" in {
-        p.parseAll(l) match {
-          case Left(e)  => fail(l + "\n" + formatError(e) + "\n" + e.toString)
-          case Right(_) => val _ = succeed
-        }
-      }
-
-    def fails(implicit p: Parser[T]): Unit =
-      s"$l" in {
-        p.parseAll(l) match {
-          case Left(_)      => succeed
-          case Right(value) => fail(s"Expected failure got $value")
-        }
-      }
-
-  }
+class SQLParserSpec extends SqlParserTestDsl {
 
   "Literals" - {
     "StringLiteral" - {
@@ -95,6 +62,8 @@ class SQLParserSpec extends AnyFreeSpec with Matchers {
   }
 
   val one = LiteralExpression(NumberLiteral(BigDecimal(1)))
+  val ttrue = LiteralExpression(BoolLiteral(true))
+  val tfalse = LiteralExpression(BoolLiteral(false))
 
   "BinaryExpression" - {
     implicit val parser = expression
@@ -116,6 +85,10 @@ class SQLParserSpec extends AnyFreeSpec with Matchers {
       Binary(one, one, Operator.B(BinaryOperator.Times)),
       Operator.B(BinaryOperator.Times)
     )
+    "true && false" parsesTo (Binary(ttrue, tfalse, Operator.And))
+
+    "true || false" parsesTo (Binary(ttrue, tfalse, Operator.Or))
+
   }
 
   "Parens" - {
@@ -255,4 +228,41 @@ class SQLParserSpec extends AnyFreeSpec with Matchers {
       "SELECT 1 FROM didier JOIN tata ON 1 WHERE 2" parses
     }
   }
+}
+
+trait SqlParserTestDsl extends AnyFreeSpec with Matchers {
+
+  implicit class TestWrapper[T](l: String) {
+
+    def parsesTo[K >: T](result: T)(implicit p: Parser[K]): Unit =
+      s"$l" in {
+        p.parseAll(l) match {
+          case Left(e)      => fail(e.toString)
+          case Right(value) => val _ = assert(value === result)
+        }
+      }
+
+    def formatError(e: Parser.Error): String = e match {
+      case Parser.Error(pos, _) =>
+        (1 to pos).map(_ => " ").mkString + "^"
+    }
+
+    def parses(implicit p: Parser[_]): Unit =
+      s"$l" in {
+        p.parseAll(l) match {
+          case Left(e)  => fail(l + "\n" + formatError(e) + "\n" + e.toString)
+          case Right(_) => val _ = succeed
+        }
+      }
+
+    def fails(implicit p: Parser[T]): Unit =
+      s"$l" in {
+        p.parseAll(l) match {
+          case Left(_)      => succeed
+          case Right(value) => fail(s"Expected failure got $value")
+        }
+      }
+
+  }
+
 }

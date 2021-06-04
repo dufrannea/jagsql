@@ -128,6 +128,14 @@ object SQLParser {
     (
       "/",
       BinaryOperator.Divided
+    ),
+    (
+      "||",
+      BinaryOperator.Or
+    ),
+    (
+      "&&",
+      BinaryOperator.And
     )
   )
 
