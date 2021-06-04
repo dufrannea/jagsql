@@ -2,11 +2,11 @@ package duff
 
 import cats.data.NonEmptyList
 import cats.parse.Parser
-import duff.CST._
-import duff.CST.Expression._
-import duff.CST.Literal._
-import duff.CST.Statement._
-import duff.CST.Source._
+import duff.cst._
+import duff.cst.Expression._
+import duff.cst.Literal._
+import duff.cst.Statement._
+import duff.cst.Source._
 import duff.SQLParser._
 import org.scalatest.freespec.AnyFreeSpec
 import org.scalatest.matchers.should.Matchers
@@ -19,25 +19,30 @@ class SQLParserSpec extends AnyFreeSpec with Matchers {
 
     def parsesTo[K >: T](result: T)(implicit p: Parser[K]): Unit =
       s"$l" in {
-        p.parse(l) match {
-          case Left(e)           => fail(e.toString)
-          case Right((_, value)) => val _ = assert(value === result)
+        p.parseAll(l) match {
+          case Left(e)      => fail(e.toString)
+          case Right(value) => val _ = assert(value === result)
         }
       }
 
+    def formatError(e: Parser.Error): String = e match {
+      case Parser.Error(pos, _) =>
+        (1 to pos).map(_ => " ").mkString + "^"
+    }
+
     def parses(implicit p: Parser[_]): Unit =
       s"$l" in {
-        p.parse(l) match {
-          case Left(e)  => fail(e.toString)
+        p.parseAll(l) match {
+          case Left(e)  => fail(l + "\n" + formatError(e) + "\n" + e.toString)
           case Right(_) => val _ = succeed
         }
       }
 
     def fails(implicit p: Parser[T]): Unit =
       s"$l" in {
-        p.parse(l) match {
-          case Left(_)           => succeed
-          case Right((_, value)) => fail(s"Expected failure got $value")
+        p.parseAll(l) match {
+          case Left(_)      => succeed
+          case Right(value) => fail(s"Expected failure got $value")
         }
       }
 
@@ -78,11 +83,14 @@ class SQLParserSpec extends AnyFreeSpec with Matchers {
       "didier",
       List(LiteralExpression(NumberLiteral(1)))
     ): Expression)
+
+    "file(1)" parses
   }
+
   val one = LiteralExpression(NumberLiteral(BigDecimal(1)))
 
   "BinaryExpression" - {
-    implicit val parser = binaryExpression
+    implicit val parser = expression
     "'salut'" parsesTo (LiteralExpression(StringLiteral("salut")): Expression)
     "1" parsesTo (LiteralExpression(NumberLiteral(BigDecimal("1"))): Expression)
 
@@ -96,6 +104,51 @@ class SQLParserSpec extends AnyFreeSpec with Matchers {
     "1 - 1" parsesTo (Binary(one, one, Operator.B(BinaryOperator.Minus)))
     "1 / 1" parsesTo (Binary(one, one, Operator.B(BinaryOperator.Divided)))
     "1 * 1" parsesTo (Binary(one, one, Operator.B(BinaryOperator.Times)))
+    "1 * 1 * 1" parsesTo Binary(
+      one,
+      Binary(one, one, Operator.B(BinaryOperator.Times)),
+      Operator.B(BinaryOperator.Times)
+    )
+  }
+
+  "Parens" - {
+    implicit val parser = expression
+
+    "('salut')" parsesTo (LiteralExpression(StringLiteral("salut")): Expression)
+    "(1)" parsesTo (LiteralExpression(NumberLiteral(BigDecimal("1"))): Expression)
+
+    "(1 = 1)" parsesTo (Binary(one, one, Operator.B(BinaryOperator.Equal)))
+    "(1 != 1)" parsesTo (Binary(one, one, Operator.B(BinaryOperator.Different)))
+    "(1 <= 1)" parsesTo (Binary(one, one, Operator.B(BinaryOperator.LessEqual)))
+    "(1 >= 1)" parsesTo (Binary(one, one, Operator.B(BinaryOperator.MoreEqual)))
+    "(1 < 1)" parsesTo (Binary(one, one, Operator.B(BinaryOperator.Less)))
+    "(1 > 1)" parsesTo (Binary(one, one, Operator.B(BinaryOperator.More)))
+    "(1 + 1)" parsesTo (Binary(one, one, Operator.B(BinaryOperator.Plus)))
+    "(1 - 1)" parsesTo (Binary(one, one, Operator.B(BinaryOperator.Minus)))
+    "(1 / 1)" parsesTo (Binary(one, one, Operator.B(BinaryOperator.Divided)))
+    "(1 * 1)" parsesTo (Binary(one, one, Operator.B(BinaryOperator.Times)))
+    "(((1 * 1)))" parsesTo (Binary(one, one, Operator.B(BinaryOperator.Times)))
+
+    "1 + 1 + 1" parsesTo Binary(
+      one,
+      Binary(one, one, Operator.B(BinaryOperator.Plus)),
+      Operator.B(BinaryOperator.Plus)
+    )
+
+    "1 + (1 * 1)" parsesTo Binary(
+      one,
+      Binary(one, one, Operator.B(BinaryOperator.Times)),
+      Operator.B(BinaryOperator.Plus)
+    )
+
+    "(1 * 1) + 1" parses
+
+    "(1 * 1) + (1 * 1)" parsesTo (Binary(
+      (Binary(one, one, Operator.B(BinaryOperator.Times))),
+      (Binary(one, one, Operator.B(BinaryOperator.Times))),
+      Operator.B(BinaryOperator.Plus)
+    ))
+
   }
 
   "Statements" - {
@@ -159,6 +212,8 @@ class SQLParserSpec extends AnyFreeSpec with Matchers {
 
       "FROM didier JOIN tata ON 1" parses
 
+      "FROM didier JOIN tata ON 1 JOIN toto ON 2 JOIN toto ON 2" parses
+
       "FROM didier JOIN tata ON 1 JOIN toto ON 2" parses
 
       "FROM didier JOIN tata" fails
@@ -167,6 +222,20 @@ class SQLParserSpec extends AnyFreeSpec with Matchers {
 
       "FROM didier JOIN tata ON 1 JOIN toto" fails
 
+    }
+
+    "JOIN" - {
+      implicit val parser = joinClausea
+
+      "JOIN tata ON 2" parses
+
+      "JOIN tata ON 3 " parses
+
+      "JOIN tata ON 2 JOIN tata ON 2" parses
+
+      "JOIN tata ON 2 JOIN tata ON 2 JOIN tata ON 2" parses
+
+      "JOIN tata" fails
     }
 
     "WHERE" - {

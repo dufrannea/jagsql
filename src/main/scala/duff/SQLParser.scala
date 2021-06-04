@@ -10,7 +10,7 @@ import scala.util.matching.Regex
 import scala.util.Failure
 import scala.util.Success
 import scala.util.Try
-import duff.CST._
+import duff.cst._
 import Expression._
 import Statement._
 import cats.parse.Parser0
@@ -90,16 +90,6 @@ object SQLParser {
       .rep
       .map(_.toList.mkString)
 
-  val expression: Parser[Expression] = Parser.recursive[Expression] { recurse =>
-    val functionCall: Parser[(String, NonEmptyList[Expression])] =
-      (identifier <* Parser
-        .char('(')) ~ (recurse.rep(1) <* Parser.char(')'))
-
-    literal.map(LiteralExpression.apply) | functionCall.map { case (str, e) =>
-      FunctionCallExpression(str, e.toList)
-    }
-  }
-
   val ops = List(
     ("=", BinaryOperator.Equal),
     ("!=", BinaryOperator.Different),
@@ -141,13 +131,20 @@ object SQLParser {
     Parser.string(s).map(_ => op)
   })
 
-  val start: Parser[Expression] = expression <* w.?
-  val end = ((binaryOperator <* w) ~ expression).?
+  val expression: Parser[Expression] = Parser.recursive[Expression] { recurse =>
+    val functionCall: Parser[(String, NonEmptyList[Expression])] =
+      (identifier <* Parser
+        .char('(')) ~ (recurse.rep(1) <* Parser.char(')'))
 
-  val binaryExpression = (start ~ end).map {
-    case (left, None)              => left
-    case (left, Some((op, right))) =>
-      Binary(left, right, Operator.B(op))
+    val term = literal.map(LiteralExpression.apply) | functionCall.map { case (str, e) =>
+      FunctionCallExpression(str, e.toList)
+    } | (Parser.char('(') *> w.? *> recurse <* w.? *> Parser.char(')'))
+
+    ((term <* w.?) ~ ((binaryOperator <* w) ~ recurse).?).map {
+      case (t, Some((operator, exp))) =>
+        Binary(t, exp, Operator.B(operator))
+      case (t, None)                  => t
+    }
   }
 
   val projection: Parser[Expression] = expression
@@ -155,10 +152,12 @@ object SQLParser {
   val tableIdentifier: Parser[Source] =
     STDIN.map(_ => Source.StdIn) | identifier.map(id => Source.TableRef(id))
 
+  val joinClause = (JOIN *> w *> (tableIdentifier <* w.?) ~ (ON *> w *> expression <* w.?)).rep(1)
+
   val fromClause =
-    ((FROM *> w *> (tableIdentifier <* w.?) ~ (JOIN *> w *> (tableIdentifier <* w.?) ~ (ON *> w *> expression))
-      .repSep0(0, w)) <* w.?)
-      .map { case (source, others) =>
+    (FROM *> w *> (tableIdentifier <* w.?) ~ joinClause.?)
+      .map { case (source, o) =>
+        val others = o.toList.flatMap(_.toList)
         val tail = others.map { case (source, predicates) =>
           FromItem(source, Some(predicates))
         }

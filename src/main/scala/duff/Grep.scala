@@ -62,7 +62,9 @@ object Main {
                 )
               } else {
                 val line =
-                  currentMatch.before.toString + Console.RED + currentMatch.matched.toString + Console.RESET + currentMatch
+                  currentMatch.before.toString + Console.RED + currentMatch
+                    .matched
+                    .toString + Console.RESET + currentMatch
                     .after
                     .toString()
                 println(s"$filePathPrefix${lineNumber.toString}: $line")

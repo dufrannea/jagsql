@@ -1,6 +1,6 @@
 package duff
 
-import duff.CST
+import duff.cst
 import cats.effect._
 
 object Planner {}
