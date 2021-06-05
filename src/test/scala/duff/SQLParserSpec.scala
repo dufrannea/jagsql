@@ -12,6 +12,7 @@ import org.scalatest.freespec.AnyFreeSpec
 import org.scalatest.matchers.should.Matchers
 
 import scala.language.postfixOps
+import org.scalactic.anyvals.NonEmptyMap
 
 class SQLParserSpec extends SqlParserTestDsl {
 
@@ -189,43 +190,48 @@ class SQLParserSpec extends SqlParserTestDsl {
 
     }
 
-    // "FROM" - {
-    //   implicit val parser = fromClause
+    "FROM" - {
+      implicit val parser = selectStatement
 
-    //   "FROM didier" parsesTo
-    //     FromClause(
-    //       NonEmptyList.one(
-    //         FromItem(TableRef("didier"), None)
-    //       )
-    //     )
+      "SELECT 1 FROM didier" parsesTo
+        SelectStatement(
+          NonEmptyList.one(Projection(one)),
+          Some(
+            FromClause(
+              NonEmptyList.one(
+                FromItem(TableRef("didier"), None)
+              )
+            )
+          )
+        )
 
-    //   "FROM didier JOIN tata ON 1" parses
+      "SELECT 1 FROM didier JOIN tata ON 1" parses
 
-    //   "FROM didier JOIN tata ON 1 JOIN toto ON 2 JOIN toto ON 2" parses
+      "SELECT 1 FROM didier JOIN tata ON 1 JOIN toto ON 2 JOIN toto ON 2" parses
 
-    //   "FROM didier JOIN tata ON 1 JOIN toto ON 2" parses
+      "SELECT 1 FROM didier JOIN tata ON 1 JOIN toto ON 2" parses
 
-    //   "FROM didier JOIN tata" fails
+      "SELECT 1 FROM didier JOIN tata" fails
 
-    //   "FROM didier JOIN tata JOIN toto" fails
+      "SELECT 1 FROM didier JOIN tata JOIN toto" fails
 
-    //   "FROM didier JOIN tata ON 1 JOIN toto" fails
+      "SELECT 1 FROM didier JOIN tata ON 1 JOIN toto" fails
 
-    // }
+    }
 
-    // "JOIN" - {
-    //   implicit val parser = joinClause
+    "JOIN" - {
+      implicit val parser = selectStatement
 
-    //   "JOIN tata ON 2" parses
+      "SELECT 1 FROM STDIN JOIN tata ON 2" parses
 
-    //   "JOIN tata ON 3 " parses
+      "SELECT 1 FROM STDIN JOIN tata ON 3 " parses
 
-    //   "JOIN tata ON 2 JOIN tata ON 2" parses
+      "SELECT 1 FROM STDIN JOIN tata ON 2 JOIN tata ON 2" parses
 
-    //   "JOIN tata ON 2 JOIN tata ON 2 JOIN tata ON 2" parses
+      "SELECT 1 FROM STDIN JOIN tata ON 2 JOIN tata ON 2 JOIN tata ON 2" parses
 
-    //   "JOIN tata" fails
-    // }
+      "SELECT 1 FROM STDIN JOIN tata" fails
+    }
 
     "WHERE" - {
       implicit val parser = selectStatement
