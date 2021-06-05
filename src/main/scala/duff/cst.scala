@@ -9,6 +9,7 @@ import Literal.StringLiteral
 
 import java.nio.file.Path
 import scala.math.BigDecimal
+import duff.cst.Projection
 
 enum Literal {
   case StringLiteral(a: String)
@@ -51,6 +52,8 @@ object Operator {
   val And = B(BinaryOperator.And)
 }
 
+case class Projection(expression: Expression, maybeAlias: Option[String] = None)
+
 enum Expression {
   case LiteralExpression(literal: Literal)
   case FunctionCallExpression(name: String, arguments: Seq[Expression])
@@ -61,6 +64,7 @@ enum Expression {
 enum Source {
   case StdIn
   case TableRef(identifier: String)
+  case SubQuery(statement: Statement.SelectStatement, alias: String)
 }
 
 case class FromItem(source: Source, maybeJoinPredicates: Option[Expression])
@@ -71,7 +75,7 @@ case class WhereClause(expression: Expression)
 enum Statement {
 
   case SelectStatement(
-    projections: NonEmptyList[Expression],
+    projections: NonEmptyList[Projection],
     fromClause: Option[FromClause] = None,
     whereClause: Option[WhereClause] = None
   )

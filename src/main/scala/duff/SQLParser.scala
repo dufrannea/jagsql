@@ -14,6 +14,7 @@ import duff.cst._
 import Expression._
 import Statement._
 import cats.parse.Parser0
+import cats.syntax.align
 
 object SQLParser {
 
@@ -159,42 +160,54 @@ object SQLParser {
     }
   }
 
-  val projection: Parser[Expression] = expression
-
-  val tableIdentifier: Parser[Source] =
-    STDIN.map(_ => Source.StdIn) | identifier.map(id => Source.TableRef(id))
-
-  val joinClause = (JOIN *> w *> (tableIdentifier <* w.?) ~ (ON *> w *> expression <* w.?)).rep(1)
-
-  val fromClause =
-    (FROM *> w *> (tableIdentifier <* w.?) ~ joinClause.?)
-      .map { case (source, o) =>
-        val others = o.toList.flatMap(_.toList)
-        val tail = others.map { case (source, predicates) =>
-          FromItem(source, Some(predicates))
-        }
-        FromClause(
-          NonEmptyList(
-            FromItem(source, None),
-            tail
-          )
-        )
-      }
+  val projection: Parser[Projection] = (expression ~ (keyword("AS") *> w *> identifier <* w.?).?).map { case (e, _) =>
+    Projection(e, None)
+  }
 
   val whereClause = (WHERE *> w *> expression).map(e => WhereClause(e))
 
-  val selectWithProjections =
-    (SELECT *> w *> (projection <* w.?).repSep(1, Parser.char(',') <* w.?))
-      .map { case (first) =>
-        first
-      }
-
   // TODO: can we support only where without FROM ?
-  val selectStatement: Parser[Statement] =
-    (selectWithProjections ~ (fromClause.?) ~ whereClause.?)
-      .map { case ((expressions, maybeFromClause), maybeWhereClause) =>
-        SelectStatement(expressions, maybeFromClause, maybeWhereClause)
-      }
+  val selectStatement: Parser[Statement] = Parser.recursive { recurse =>
+
+    val parensSub = Parser.char('(') *> w.? *> recurse <* w.? *> Parser.char(')')
+
+    val selectSource: Parser[Source] =
+      STDIN.map(_ => Source.StdIn) | identifier
+        .map(id => Source.TableRef(id)) | (parensSub ~ (w *> keyword("AS") *> w *> identifier <* w.?))
+        .map { case (statement, alias) => Source.SubQuery(statement.asInstanceOf[SelectStatement], alias) }
+
+    val joinClause = (JOIN *> w *> (selectSource <* w.?) ~ (ON *> w *> expression <* w.?)).rep(1)
+
+    val fromClause =
+      (FROM *> w *> (selectSource <* w.?) ~ joinClause.?)
+        .map { case (source, o) =>
+          val others = o.toList.flatMap(_.toList)
+          val tail = others.map { case (source, predicates) =>
+            FromItem(source, Some(predicates))
+          }
+          FromClause(
+            NonEmptyList(
+              FromItem(source, None),
+              tail
+            )
+          )
+        }
+
+    val selectWithProjections =
+      (SELECT *> w *> (projection <* w.?).repSep(1, Parser.char(',') <* w.?))
+        .map { case (first) =>
+          first
+        }
+
+    val t =
+      (selectWithProjections ~ (fromClause.?) ~ whereClause.?)
+        .map { case ((expressions, maybeFromClause), maybeWhereClause) =>
+          SelectStatement(expressions, maybeFromClause, maybeWhereClause)
+        }
+
+    t
+
+  }
 
   // Arithmetic operations
   // Group expansion of regexes with several groups (or better syntax, maybe glob ? maybe cut ?)

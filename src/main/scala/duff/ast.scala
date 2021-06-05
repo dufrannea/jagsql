@@ -66,11 +66,13 @@ case class FromItem(source: cst.Source, joinPredicates: Option[Expression])
 case class FromClause(items: NonEmptyList[FromItem])
 case class WhereClause(expression: Expression)
 
+case class Projection(e: Expression, maybeAlias: Option[String])
+
 enum Statement {
   import cats.data.NonEmptyList
 
   case SelectStatement(
-    projections: NonEmptyList[Expression],
+    projections: NonEmptyList[Projection],
     fromClause: FromClause,
     whereClause: Option[WhereClause] = None
   )
@@ -156,7 +158,9 @@ def analyzeStatement(s: cst.Statement): Either[String, Statement] =
                                    } yield FromClause(analyzedItems)
 
                                }
-        analyzedProjections <- projections.traverse(analyzeExpression)
+        analyzedProjections <- projections.traverse { case cst.Projection(expression, alias) =>
+                                 analyzeExpression(expression).map(e => Projection(e, alias))
+                               }
         analyzedWhere <- maybeWhere.traverse(where => analyzeExpression(where.expression).map(k => WhereClause(k)))
       } yield Statement.SelectStatement(analyzedProjections, analyzedFrom, analyzedWhere)
   }
