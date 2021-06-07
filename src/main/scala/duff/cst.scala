@@ -59,6 +59,7 @@ enum Expression {
   case FunctionCallExpression(name: String, arguments: Seq[Expression])
   case Binary(left: Expression, right: Expression, operator: Operator)
   case Unary(expression: Expression)
+  case IdentifierExpression(identifier: String)
 }
 
 enum Source {
@@ -67,8 +68,8 @@ enum Source {
   case SubQuery(statement: Statement.SelectStatement, alias: String)
 }
 
-case class FromItem(source: Source, maybeJoinPredicates: Option[Expression])
-case class FromClause(items: NonEmptyList[FromItem])
+case class FromSource(source: Source, maybeJoinPredicates: Option[Expression])
+case class FromClause(items: NonEmptyList[FromSource])
 
 case class WhereClause(expression: Expression)
 

@@ -160,7 +160,7 @@ class SQLParserSpec extends SqlParserTestDsl {
         Some(
           FromClause(
             NonEmptyList.one(
-              FromItem(TableRef("foo"), None)
+              FromSource(TableRef("foo"), None)
             )
           )
         )
@@ -171,9 +171,9 @@ class SQLParserSpec extends SqlParserTestDsl {
         Some(
           FromClause(
             NonEmptyList(
-              FromItem(TableRef("foo"), None),
+              FromSource(TableRef("foo"), None),
               List(
-                FromItem(TableRef("bar"), Some(one))
+                FromSource(TableRef("bar"), Some(one))
               )
             )
           )
@@ -184,9 +184,13 @@ class SQLParserSpec extends SqlParserTestDsl {
 
       "SELECT 'a' FROM (SELECT 'b' FROM (SELECT 1) AS bar) AS foo" parses
 
-      "SELECT 1 AS foo" parses
+      "SELECT 1 AS foo" parsesTo SelectStatement(
+        NonEmptyList.one(Projection(one, Some("foo")))
+      )
 
       "SELECT 1 AS foo, '2', 'bar' AS baz" parses
+
+      "SELECT foo.bar FROM (SELECT 1 AS bar) AS foo JOIN (SELECT 2 AS bar) AS baz ON foo.bar = baz.bar" parses 
 
     }
 
@@ -199,7 +203,7 @@ class SQLParserSpec extends SqlParserTestDsl {
           Some(
             FromClause(
               NonEmptyList.one(
-                FromItem(TableRef("didier"), None)
+                FromSource(TableRef("didier"), None)
               )
             )
           )
@@ -242,6 +246,20 @@ class SQLParserSpec extends SqlParserTestDsl {
 
       "SELECT 1 FROM didier JOIN tata ON 1 WHERE 2" parses
     }
+
+    "Identifiers" - {
+      implicit val parser = selectStatement
+
+      "SELECT foo" parses
+
+      "SELECT foo, bar" parses
+
+      "SELECT foo, 'bar', baz" parses
+
+      "SELECT foo.bar" parses
+
+    }
+
   }
 
 }

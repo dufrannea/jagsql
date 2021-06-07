@@ -8,6 +8,7 @@ import cst.Literal
 import ast._
 import duff.SQLParser.expression
 import scala.language.postfixOps
+import cats.data.State
 
 class ExpressionAnalysisSpec extends AnalysisDsl:
 
@@ -101,7 +102,7 @@ class ExpressionAnalysisSpec extends AnalysisDsl:
 
 trait AnalysisDsl extends AnyFreeSpec with Matchers:
 
-  def analyze(e: cst.Expression): Either[String, ast.Expression] = analyzeExpression(e)
+  def analyze(e: cst.Expression): Either[String, ast.Expression] = analyzeExpression(e).runA(Map.empty)
   def analyze(c: String): Either[String, ast.Expression] =
     analyze(expression.parseAll(c).getOrElse(sys.error("testspec is wrong, cannot parse input")))
 

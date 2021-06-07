@@ -18,6 +18,10 @@ import cats.syntax.align
 
 object SQLParser {
 
+  def indexed[T](p: Parser[T]): Parser[(T, (Int, Int))] = (Parser.index.with1 ~ p ~ Parser.index).map {
+    case ((from, what), to) => (what, (from, to))
+  }
+
   private[this] val whitespace: Parser[Unit] = Parser.charIn(" \t\r\n").void
   private[this] val w: Parser[Unit] = whitespace.rep.void
 
@@ -89,11 +93,20 @@ object SQLParser {
 
   val literal: Parser[Literal] = regexLiteral | stringLiteral | numberLiteral | boolLiteral
 
-  val identifier: Parser[String] =
-    Parser
+  val compositeIdentifier: Parser[String] = {
+
+    val identifier = Parser
       .charIn("abcdefghijklmnopqrstuvwxyz0123456789".toList)
       .rep
-      .map(_.toList.mkString)
+
+    (identifier ~ (Parser.char('.') *> identifier).?).map { case (left, maybeRight) =>
+      left.toList.mkString + (maybeRight match {
+        case None        => ""
+        case Some(chars) => "." + chars.toList.mkString
+      })
+    }
+
+  }
 
   val ops = List(
     ("=", BinaryOperator.Equal),
@@ -146,12 +159,18 @@ object SQLParser {
 
   val expression: Parser[Expression] = Parser.recursive[Expression] { recurse =>
     val functionCall: Parser[(String, NonEmptyList[Expression])] =
-      (identifier <* Parser
+      (compositeIdentifier <* Parser
         .char('(')) ~ (recurse.rep(1) <* Parser.char(')'))
 
+    // backtracking on function call because of the ambiguity of the single
+    // identifier vs identifier + parens for the functions
+    // we can avoid backtracking by creating a functionOrIdentifier parser
+    // TODO: this ^
     val term = literal.map(LiteralExpression.apply) | functionCall.map { case (str, e) =>
       FunctionCallExpression(str, e.toList)
-    } | (Parser.char('(') *> w.? *> recurse <* w.? *> Parser.char(')'))
+    }.backtrack | (Parser.char('(') *> w.? *> recurse <* w.? *> Parser.char(')')) | compositeIdentifier.map(
+      IdentifierExpression.apply
+    )
 
     ((term <* w.?) ~ ((binaryOperator <* w) ~ recurse).?).map {
       case (t, Some((operator, exp))) =>
@@ -160,8 +179,9 @@ object SQLParser {
     }
   }
 
-  val projection: Parser[Projection] = (expression ~ (keyword("AS") *> w *> identifier <* w.?).?).map { case (e, _) =>
-    Projection(e, None)
+  val projection: Parser[Projection] = (expression ~ (keyword("AS") *> w *> compositeIdentifier <* w.?).?).map {
+    case (e, maybeAlias) =>
+      Projection(e, maybeAlias)
   }
 
   val whereClause = (WHERE *> w *> expression).map(e => WhereClause(e))
@@ -172,8 +192,8 @@ object SQLParser {
     val parensSub = Parser.char('(') *> w.? *> recurse <* w.? *> Parser.char(')')
 
     val selectSource: Parser[Source] =
-      STDIN.map(_ => Source.StdIn) | identifier
-        .map(id => Source.TableRef(id)) | (parensSub ~ (w *> keyword("AS") *> w *> identifier <* w.?))
+      STDIN.map(_ => Source.StdIn) | compositeIdentifier
+        .map(id => Source.TableRef(id)) | (parensSub ~ (w *> keyword("AS") *> w *> compositeIdentifier <* w.?))
         .map { case (statement, alias) => Source.SubQuery(statement.asInstanceOf[SelectStatement], alias) }
 
     val joinClause = (JOIN *> w *> (selectSource <* w.?) ~ (ON *> w *> expression <* w.?)).rep(1)
@@ -183,11 +203,11 @@ object SQLParser {
         .map { case (source, o) =>
           val others = o.toList.flatMap(_.toList)
           val tail = others.map { case (source, predicates) =>
-            FromItem(source, Some(predicates))
+            FromSource(source, Some(predicates))
           }
           FromClause(
             NonEmptyList(
-              FromItem(source, None),
+              FromSource(source, None),
               tail
             )
           )
@@ -199,13 +219,10 @@ object SQLParser {
           first
         }
 
-    val t =
-      (selectWithProjections ~ (fromClause.?) ~ whereClause.?)
-        .map { case ((expressions, maybeFromClause), maybeWhereClause) =>
-          SelectStatement(expressions, maybeFromClause, maybeWhereClause)
-        }
-
-    t
+    (selectWithProjections ~ (fromClause.?) ~ whereClause.?)
+      .map { case ((expressions, maybeFromClause), maybeWhereClause) =>
+        SelectStatement(expressions, maybeFromClause, maybeWhereClause)
+      }
 
   }
 
