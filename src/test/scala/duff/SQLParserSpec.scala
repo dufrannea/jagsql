@@ -60,6 +60,14 @@ class SQLParserSpec extends SqlParserTestDsl {
     ): Expression)
 
     "file(1)" parses
+
+    "Operator precedence" - {
+
+      "1 + 1 * 2" parses 
+      
+      "1 * 2 + 1" parses 
+
+    }
   }
 
   val one = LiteralExpression(NumberLiteral(BigDecimal(1)))
@@ -82,8 +90,8 @@ class SQLParserSpec extends SqlParserTestDsl {
     "1 / 1" parsesTo (Binary(one, one, Operator.B(BinaryOperator.Divided)))
     "1 * 1" parsesTo (Binary(one, one, Operator.B(BinaryOperator.Times)))
     "1 * 1 * 1" parsesTo Binary(
-      one,
       Binary(one, one, Operator.B(BinaryOperator.Times)),
+      one,
       Operator.B(BinaryOperator.Times)
     )
     "true && false" parsesTo (Binary(ttrue, tfalse, Operator.And))
@@ -111,8 +119,8 @@ class SQLParserSpec extends SqlParserTestDsl {
     "(((1 * 1)))" parsesTo (Binary(one, one, Operator.B(BinaryOperator.Times)))
 
     "1 + 1 + 1" parsesTo Binary(
-      one,
       Binary(one, one, Operator.B(BinaryOperator.Plus)),
+      one,
       Operator.B(BinaryOperator.Plus)
     )
 
@@ -130,6 +138,17 @@ class SQLParserSpec extends SqlParserTestDsl {
       Operator.B(BinaryOperator.Plus)
     ))
 
+    "1 + 1 * 1" parsesTo Binary(
+      one,
+      Binary(one, one, Operator.B(BinaryOperator.Times)),
+      Operator.B(BinaryOperator.Plus)
+    )
+
+    "1 * 1 + 1" parsesTo Binary(
+      Binary(one, one, Operator.B(BinaryOperator.Times)),
+      one,
+      Operator.B(BinaryOperator.Plus)
+    )
   }
 
   "Statements" - {
@@ -190,7 +209,7 @@ class SQLParserSpec extends SqlParserTestDsl {
 
       "SELECT 1 AS foo, '2', 'bar' AS baz" parses
 
-      "SELECT foo.bar FROM (SELECT 1 AS bar) AS foo JOIN (SELECT 2 AS bar) AS baz ON foo.bar = baz.bar" parses 
+      "SELECT foo.bar FROM (SELECT 1 AS bar) AS foo JOIN (SELECT 2 AS bar) AS baz ON foo.bar = baz.bar" parses
 
     }
 

@@ -128,22 +128,6 @@ object SQLParser {
       BinaryOperator.Less
     ),
     (
-      "+",
-      BinaryOperator.Plus
-    ),
-    (
-      "-",
-      BinaryOperator.Minus
-    ),
-    (
-      "*",
-      BinaryOperator.Times
-    ),
-    (
-      "/",
-      BinaryOperator.Divided
-    ),
-    (
       "||",
       BinaryOperator.Or
     ),
@@ -153,9 +137,47 @@ object SQLParser {
     )
   )
 
+  val timesDivided = List(
+    (
+      "*",
+      BinaryOperator.Times
+    ),
+    (
+      "/",
+      BinaryOperator.Divided
+    )
+  )
+
+  val plusMinus = List(
+    (
+      "+",
+      BinaryOperator.Plus
+    ),
+    (
+      "-",
+      BinaryOperator.Minus
+    )
+  )
+
   val binaryOperator = Parser.oneOf(ops.map { case (s, op) =>
     Parser.string(s).map(_ => op)
   })
+
+  val plusMinusOperator = Parser.oneOf(plusMinus.map { case (s, op) =>
+    Parser.string(s).map(_ => op)
+  })
+
+  val timesDividedOperator = Parser.oneOf(timesDivided.map { case (s, op) =>
+    Parser.string(s).map(_ => op)
+  })
+
+  def binaryExpression(operator: Parser[BinaryOperator])(inner: Parser[Expression]) = {
+    ((inner <* w.?) ~ (operator ~ (w.? *> inner <* w.?)).rep0).map { case (left, rightOperands) =>
+      rightOperands.foldLeft(left) { case (acc, (op, current)) =>
+        Binary(acc, current, Operator.B(op))
+      }
+    }
+  }
 
   val expression: Parser[Expression] = Parser.recursive[Expression] { recurse =>
     val functionCall: Parser[(String, NonEmptyList[Expression])] =
@@ -172,11 +194,10 @@ object SQLParser {
       IdentifierExpression.apply
     )
 
-    ((term <* w.?) ~ ((binaryOperator <* w) ~ recurse).?).map {
-      case (t, Some((operator, exp))) =>
-        Binary(t, exp, Operator.B(operator))
-      case (t, None)                  => t
-    }
+    val lowPriority = binaryExpression(binaryOperator)(term)
+    val times = binaryExpression(timesDividedOperator)(lowPriority)
+    val plus = binaryExpression(plusMinusOperator)(times)
+    plus
   }
 
   val projection: Parser[Projection] = (expression ~ (keyword("AS") *> w *> compositeIdentifier <* w.?).?).map {
