@@ -1,6 +1,10 @@
 package duff
 package ast
 
+// import ast._
+import utils._
+import cst.Operator
+
 import cats._
 import cats.implicits._
 import cats.data.NonEmptyList
@@ -8,8 +12,6 @@ import cats.data.NonEmptyMap
 
 import scala.language.experimental
 import scala.util.Try
-import duff.cst.Operator
-import duff.ast
 import cats.data.State
 
 enum SimpleType {
@@ -66,8 +68,6 @@ object ExpressionF {
     }
 
 }
-
-case class Fix[F[_]](val unfix: F[Fix[F]])
 
 type Expression = Fix[ExpressionF]
 

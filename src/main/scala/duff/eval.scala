@@ -2,6 +2,8 @@ package duff
 package eval
 
 import ast._
+import utils._
+
 import duff.cst.Literal
 import cats._
 import cats.implicits._
@@ -44,10 +46,6 @@ def alg(e: ExpressionF[Value]): Value = e match {
     }
 
   case _ => Error
-}
-
-def cata[F[_]: Functor, K](alg: F[K] => K)(e: Fix[F]): K = {
-  alg(e.unfix.map(cata(alg)))
 }
 
 def eval(e: ast.Expression): Value = {

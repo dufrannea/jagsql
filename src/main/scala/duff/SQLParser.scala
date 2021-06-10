@@ -17,9 +17,10 @@ import cats.parse.Parser0
 import cats.syntax.align
 
 object SQLParser {
+  case class Position(from: Int, to: Int)
 
-  def indexed[T](p: Parser[T]): Parser[(T, (Int, Int))] = (Parser.index.with1 ~ p ~ Parser.index).map {
-    case ((from, what), to) => (what, (from, to))
+  def indexed[T](p: Parser[T]): Parser[(T, Position)] = (Parser.index.with1 ~ p ~ Parser.index).map {
+    case ((from, what), to) => (what, Position(from, to))
   }
 
   private[this] val whitespace: Parser[Unit] = Parser.charIn(" \t\r\n").void
@@ -37,6 +38,8 @@ object SQLParser {
       .string(s)
       .map(_ => Keyword(s))
 
+  // I need to watch tpolecat's presentation on cofree to embed the things in his parser
+  //  - IndexedParser with positions ?
   val SELECT: Parser[Keyword] = keyword("SELECT")
   val FROM: Parser[Keyword] = keyword("FROM")
   val WHERE: Parser[Keyword] = keyword("WHERE")

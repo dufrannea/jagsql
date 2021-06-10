@@ -1,13 +1,17 @@
 package duff
+package ast
 
+import utils._
+import SQLParser.selectStatement
+
+import org.scalatest
 import org.scalatest.freespec.AnyFreeSpec
 import org.scalatest.matchers.should.Matchers
-import org.scalatest
-import ast._
-import duff.SQLParser.selectStatement
-import scala.language.postfixOps
+
 import cats.data.NonEmptyList
 import cats.data.NonEmptyMap
+
+import scala.language.postfixOps
 
 class StatementAnalysisSpec extends StatementAnalysisDsl:
 

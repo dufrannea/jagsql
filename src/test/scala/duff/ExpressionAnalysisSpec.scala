@@ -1,14 +1,18 @@
 package duff
+package ast
+
+import cst.Expression
+import cst.Literal
+import SQLParser.expression
+import utils._
+
+import cats.data.State
 
 import org.scalatest.freespec.AnyFreeSpec
 import org.scalatest.matchers.should.Matchers
 import org.scalatest
-import cst.Expression
-import cst.Literal
-import ast._
-import duff.SQLParser.expression
+
 import scala.language.postfixOps
-import cats.data.State
 
 class ExpressionAnalysisSpec extends AnalysisDsl:
 
