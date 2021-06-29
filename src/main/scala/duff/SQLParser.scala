@@ -216,6 +216,8 @@ object SQLParser {
     val parensSub = Parser.char('(') *> w.? *> recurse <* w.? *> Parser.char(')')
 
     val selectSource: Parser[Source] =
+      // Tableref is for when CTE will be supported, currently there is no way to
+      // refer to a subquery in another join clause
       STDIN.map(_ => Source.StdIn) | compositeIdentifier
         .map(id => Source.TableRef(id)) | (parensSub ~ (w *> keyword("AS") *> w *> compositeIdentifier <* w.?))
         .map { case (statement, alias) => Source.SubQuery(statement.asInstanceOf[SelectStatement], alias) }

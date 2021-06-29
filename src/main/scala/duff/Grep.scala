@@ -161,31 +161,3 @@ object Main {
   }
 
 }
-
-//   def lol() = {
-//     val count = 10485760
-
-//     var memoryMappedFile: RandomAccessFile = null
-//     try {
-//       memoryMappedFile = new RandomAccessFile(path, "rw")
-//       var byteBuffer =
-//         memoryMappedFile.getChannel.map(FileChannel.MapMode.READ_ONLY, 0, count)
-
-//       val a = StandardCharsets.UTF_8.newDecoder().decode(byteBuffer);
-
-//       // todo how to know if we have groups here
-//       val re = regex.r
-
-//       re.findAllIn(a).matchData.to(LazyList).foreach { currentMatch =>
-//         if (currentMatch.groupCount > 1) {
-//           println(currentMatch.group(1))
-//         } else {
-//           println(currentMatch.matched)
-//         }
-//       }
-
-//     } finally {
-//       memoryMappedFile.close()
-//     }
-
-//   }

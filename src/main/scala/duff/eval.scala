@@ -7,6 +7,8 @@ import utils._
 import duff.cst.Literal
 import cats._
 import cats.implicits._
+import cats.data.Reader
+import cats.data.Kleisli
 
 enum Value {
   case VString(e: String)
@@ -18,16 +20,19 @@ enum Value {
 import Value._
 import cst.Operator
 
-def alg(e: ExpressionF[Value]): Value = e match {
+type ExpressionValue = Reader[Map[String, Value], Value]
+
+def alg(e: ExpressionF[ExpressionValue]): ExpressionValue = e match {
   case ExpressionF.LiteralExpression(l, _)                   =>
-    l match {
+    val value = l match {
       case Literal.BoolLiteral(e)   => VBoolean(e)
       case Literal.StringLiteral(e) => VString(e)
       case Literal.NumberLiteral(e) => VNumber(e)
       case Literal.RegexLiteral(e)  => Error
     }
+    Kleisli(_ => value)
   case ExpressionF.Binary(left, right, operator, commonType) =>
-    (left, right, operator) match {
+    val v = ((left, right)).tupled.map { case (l, r) => (l, r, operator) }.map {
       case (_, _, Operator.Equal)                       => VBoolean(left == right)
       case (_, _, Operator.Different)                   => VBoolean(left != right)
       case (VNumber(i), VNumber(j), Operator.Less)      => VBoolean(i < j)
@@ -44,10 +49,14 @@ def alg(e: ExpressionF[Value]): Value = e match {
       case (VBoolean(i), VBoolean(j), Operator.Or)      => VBoolean(i || j)
       case _                                            => Error
     }
-
-  case _ => Error
+    v
+  case ExpressionF.FieldRef(value, _)                        =>
+    Kleisli { values =>
+      values(value)
+    }
+  case _                                                     => ???
 }
 
-def eval(e: ast.Expression): Value = {
+def eval(e: ast.Expression): ExpressionValue = {
   cata(alg)(e)
 }

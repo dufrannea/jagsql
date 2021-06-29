@@ -36,7 +36,7 @@ trait EvalDsl extends AnyFreeSpec with Matchers:
     for {
         analyzed <- analyze(c)
         evaluated <- eval(analyzed).asRight
-    } yield evaluated
+    } yield evaluated(Map.empty)
   }
 
   extension (c: String) {
