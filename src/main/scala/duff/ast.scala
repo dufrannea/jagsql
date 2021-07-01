@@ -77,9 +77,9 @@ sealed trait Source {
 }
 
 object Source {
-  val stdinType: ComplexType.Table = ComplexType.Table(NonEmptyMap.of("0" -> SimpleType.String))
+  val stdinType: ComplexType.Table = ComplexType.Table(NonEmptyMap.of("col_0" -> SimpleType.String))
 
-  case object StdIn extends Source {
+  case class StdIn(alias: String) extends Source {
     def tableType = stdinType
   }
 
@@ -117,7 +117,14 @@ enum Statement {
 import cats.data.StateT
 import cats.data.EitherT
 
-type Verified[K] = StateT[[A] =>> Either[String, A], Map[String, ComplexType.Table], K]
+type Scope = Map[String, ComplexType.Table]
+
+// This type is isomorphic to
+// Either[String, State[Scope, K]]
+//
+// The State is used to remember previously seen
+// table and columns resolutions
+type Verified[K] = StateT[[A] =>> Either[String, A], Scope, K]
 
 object Verified {
   def read: Verified[Map[String, ComplexType.Table]] = StateT.get
@@ -126,7 +133,6 @@ object Verified {
   def error(s: String): Verified[Nothing] = s.asLeft.liftTo[Verified]
 }
 
-// the Type I want is Either[String, State[Map[..], K]]
 def analyzeExpression(
   e: cst.Expression
 ): Verified[Fix[ExpressionF]] = e match {
@@ -215,7 +221,7 @@ def analyzeExpression(
                       tableType.cols(fieldId) match {
                         case None            => s"Non existing field $fieldId on table $tableId".asLeft.liftTo[Verified]
                         case Some(fieldType) =>
-                          Fix(ExpressionF.FieldRef(identifier, Type.Simple(fieldType))).asRight.liftTo[Verified]
+                          Fix(ExpressionF.FieldRef(fieldId, Type.Simple(fieldType))).asRight.liftTo[Verified]
                       }
                     }
                   case _                         =>
@@ -239,7 +245,14 @@ def analyzeStatement(
 
   def analyzeSource(f: cst.Source): Verified[ast.Source] = {
     f match {
-      case cst.Source.StdIn                      => Source.StdIn.asRight.liftTo[Verified]
+      // TODO: there should be no special case here
+      // for STDIN, it should be no different from a subquery or a table ref
+      case cst.Source.StdIn(alias)               =>
+        for {
+          state  <- Verified.read
+          source <- Source.StdIn(alias).asRight.liftTo[Verified]
+          _      <- Verified.set(state + (alias -> source.tableType))
+        } yield source
       case cst.Source.TableRef(id)               =>
         for {
           ref    <- Verified.read
@@ -277,9 +290,11 @@ def analyzeStatement(
   s match {
     case cst.Statement.SelectStatement(projections, from, maybeWhere) =>
       for {
+        // TODO: if FROM expansion appears at analysis, there is duplicate code
+        // happening here
         analyzedFrom        <- from match {
                                  case None    =>
-                                   FromClause(NonEmptyList.one(FromSource(Source.StdIn, None))).asRight.liftTo[Verified]
+                                   FromClause(NonEmptyList.one(FromSource(Source.StdIn("in"), None))).asRight.liftTo[Verified]
                                  case Some(f) => analyzeFromClause(f)
                                }
         analyzedProjections <- projections.traverse { case cst.Projection(expression, alias) =>
@@ -290,7 +305,7 @@ def analyzeStatement(
                   .zipWithIndex
                   .map { case (Projection(e, maybeAlias), index) =>
                     // TODO check that aliases are not repeated
-                    val name = maybeAlias.getOrElse(index.toString)
+                    val name = maybeAlias.getOrElse(s"col_$index")
                     val expressionType = e.unfix.expressionType match {
                       case Type.Simple(t) => t
                       case _              => sys.error("Expressions should return only simple types")

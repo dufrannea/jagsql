@@ -211,6 +211,8 @@ class SQLParserSpec extends SqlParserTestDsl {
 
       "SELECT foo.bar FROM (SELECT 1 AS bar) AS foo JOIN (SELECT 2 AS bar) AS baz ON foo.bar = baz.bar" parses
 
+      "SELECT col_0 FROM STDIN" parses
+
     }
 
     "FROM" - {

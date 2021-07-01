@@ -63,7 +63,7 @@ enum Expression {
 }
 
 enum Source {
-  case StdIn
+  case StdIn(alias: String)
   case TableRef(identifier: String)
   case SubQuery(statement: Statement.SelectStatement, alias: String)
 }

@@ -52,7 +52,7 @@ def alg(e: ExpressionF[ExpressionValue]): ExpressionValue = e match {
     v
   case ExpressionF.FieldRef(value, _)                        =>
     Kleisli { values =>
-      values(value)
+      values.get(value).getOrElse(sys.error(s"Key not found $value in ${values.toString}"))
     }
   case _                                                     => ???
 }

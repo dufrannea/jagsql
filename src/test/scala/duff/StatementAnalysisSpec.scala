@@ -17,12 +17,12 @@ class StatementAnalysisSpec extends StatementAnalysisDsl:
 
   val one: Expression = Fix(ExpressionF.LiteralExpression(cst.Literal.NumberLiteral(BigDecimal(1)), Type.Number))
 
-  val ss: ComplexType.Table = ComplexType.Table(NonEmptyMap.of("0" -> SimpleType.Number))
+  val ss: ComplexType.Table = ComplexType.Table(NonEmptyMap.of("col_0" -> SimpleType.Number))
 
   "SELECT 1 FROM STDIN" analyzesTo {
     Statement.SelectStatement(
       NonEmptyList.one(Projection(one, None)),
-      FromClause(NonEmptyList.of(FromSource(Source.StdIn, None))),
+      FromClause(NonEmptyList.of(FromSource(Source.StdIn("in"), None))),
       None,
       ss
     )
@@ -31,7 +31,7 @@ class StatementAnalysisSpec extends StatementAnalysisDsl:
   "SELECT 1" analyzesTo {
     Statement.SelectStatement(
       NonEmptyList.one(Projection(one, None)),
-      FromClause(NonEmptyList.of(FromSource(Source.StdIn, None))),
+      FromClause(NonEmptyList.of(FromSource(Source.StdIn("in"), None))),
       None,
       ss
     )
@@ -39,10 +39,11 @@ class StatementAnalysisSpec extends StatementAnalysisDsl:
 
   "SELECT foo.bar FROM (SELECT 1 AS bar) AS foo" succeeds
 
+  "SELECT lol.col_0 FROM STDIN AS lol" succeeds
+
   "SELECT foo.bar FROM (SELECT 1 AS bar) AS foo JOIN (SELECT 2 AS bar) AS baz ON foo.bar = baz.bar" succeeds
 
   "SELECT foo.bazzzz FROM (SELECT 1 AS bar) AS foo" fails
-
 
 trait StatementAnalysisDsl extends AnyFreeSpec with Matchers:
 
@@ -53,8 +54,10 @@ trait StatementAnalysisDsl extends AnyFreeSpec with Matchers:
     analyze(
       selectStatement
         .parseAll(c)
-        .map(_.asInstanceOf[cst.Statement.SelectStatement])
-        .getOrElse(sys.error("testspec is wrong, cannot parse input"))
+        .map(_.asInstanceOf[cst.Statement.SelectStatement]) match {
+        case Left(error)   => sys.error(s"testspec is wrong, cannot parse input, $error")
+        case Right(result) => result
+      }
     )
 
   extension (c: cst.Statement.SelectStatement)

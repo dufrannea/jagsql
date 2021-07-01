@@ -99,7 +99,7 @@ object SQLParser {
   val compositeIdentifier: Parser[String] = {
 
     val identifier = Parser
-      .charIn("abcdefghijklmnopqrstuvwxyz0123456789".toList)
+      .charIn("abcdefghijklmnopqrstuvwxyz0123456789_".toList)
       .rep
 
     (identifier ~ (Parser.char('.') *> identifier).?).map { case (left, maybeRight) =>
@@ -211,14 +211,16 @@ object SQLParser {
   val whereClause = (WHERE *> w *> expression).map(e => WhereClause(e))
 
   // TODO: can we support only where without FROM ?
-  val selectStatement: Parser[Statement] = Parser.recursive { recurse =>
+  val selectStatement: Parser[SelectStatement] = Parser.recursive { recurse =>
 
     val parensSub = Parser.char('(') *> w.? *> recurse <* w.? *> Parser.char(')')
 
     val selectSource: Parser[Source] =
       // Tableref is for when CTE will be supported, currently there is no way to
       // refer to a subquery in another join clause
-      STDIN.map(_ => Source.StdIn) | compositeIdentifier
+      (STDIN *> w.? *> (keyword("AS") *> w *> compositeIdentifier <* w.?).?).map { case (maybeAlias) =>
+        Source.StdIn(maybeAlias.getOrElse("in"))
+      } | compositeIdentifier
         .map(id => Source.TableRef(id)) | (parensSub ~ (w *> keyword("AS") *> w *> compositeIdentifier <* w.?))
         .map { case (statement, alias) => Source.SubQuery(statement.asInstanceOf[SelectStatement], alias) }
 
@@ -250,6 +252,17 @@ object SQLParser {
         SelectStatement(expressions, maybeFromClause, maybeWhereClause)
       }
 
+  }
+
+  def parse(query: String): Either[Throwable, SelectStatement] = {
+    def formatError(e: Parser.Error): String = e match {
+      case Parser.Error(pos, _) =>
+        (1 to pos).map(_ => " ").mkString + "^"
+    }
+    selectStatement.parseAll(query) match {
+      case Left(error)       => Left(new Throwable(formatError(error)))
+      case r @ Right(result) => Right(result)
+    }
   }
 
   // Arithmetic operations
