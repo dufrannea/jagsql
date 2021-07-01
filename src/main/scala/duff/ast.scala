@@ -238,10 +238,26 @@ def analyzeExpression(
     } yield result
 }
 
+// if a from clause is not present, consider we are selecting from STDIN
+def addEmptyStdin(s: cst.Statement.SelectStatement): cst.Statement.SelectStatement = {
+  s match {
+    case cst.Statement.SelectStatement(projections, None, maybeWhere) =>
+      cst
+        .Statement
+        .SelectStatement(
+          projections,
+          Some(cst.FromClause(NonEmptyList.one(cst.FromSource(cst.Source.StdIn("in"), None)))),
+          maybeWhere
+        )
+    case _                                                            => s
+  }
+}
+
 def analyzeStatement(
-  s: cst.Statement.SelectStatement
+  i: cst.Statement.SelectStatement
 ): Verified[Statement.SelectStatement] =
   val ss: ComplexType.Table = ComplexType.Table(NonEmptyMap.of("foo" -> SimpleType.Number))
+  val s = addEmptyStdin(i)
 
   def analyzeSource(f: cst.Source): Verified[ast.Source] = {
     f match {
@@ -293,8 +309,7 @@ def analyzeStatement(
         // TODO: if FROM expansion appears at analysis, there is duplicate code
         // happening here
         analyzedFrom        <- from match {
-                                 case None    =>
-                                   FromClause(NonEmptyList.one(FromSource(Source.StdIn("in"), None))).asRight.liftTo[Verified]
+                                 case None    => sys.error("should not happen, from clause has already been substituted")
                                  case Some(f) => analyzeFromClause(f)
                                }
         analyzedProjections <- projections.traverse { case cst.Projection(expression, alias) =>

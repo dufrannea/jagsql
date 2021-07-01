@@ -254,13 +254,14 @@ object SQLParser {
 
   }
 
-  def parse(query: String): Either[Throwable, SelectStatement] = {
+  def parse(query: String): Either[String, SelectStatement] = {
     def formatError(e: Parser.Error): String = e match {
       case Parser.Error(pos, _) =>
         (1 to pos).map(_ => " ").mkString + "^"
     }
     selectStatement.parseAll(query) match {
-      case Left(error)       => Left(new Throwable(formatError(error)))
+      case Left(error) => Left("In query :\n" + query + "\n" + formatError(error) + "\n" + error.toString)
+
       case r @ Right(result) => Right(result)
     }
   }

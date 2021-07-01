@@ -22,7 +22,6 @@ class evalSpec extends EvalDsl:
 
   "1 + 1 * 2" evaluatesTo Value.VNumber(BigDecimal(3)) 
 
-  // TODO: fix operator precedence
   "2 * 1 + 1" evaluatesTo Value.VNumber(BigDecimal(3)) 
 
 trait EvalDsl extends AnyFreeSpec with Matchers:

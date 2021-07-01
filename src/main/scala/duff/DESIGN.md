@@ -39,3 +39,18 @@ difficulty because regex is at the same time
 a where and a projection
 
 select /didier/
+
+
+TODO:
+- there should be only one reading from stdin or they should be put in common, currently there is only one possible stream reading (the others will never return anything)
+- fix additional line at end of stream
+- implement regex evaluation and expansion
+- unify sources (stdin, dual etc. should really be relevant in the running phase)
+- implement DUAL
+- implement FILE (maybe file literal)
+- implement dirs
+
+
+THOUGHTS:
+- recursive CTE support ?
+- windows (tumble, etc.)
