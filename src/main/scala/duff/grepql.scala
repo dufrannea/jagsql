@@ -39,8 +39,8 @@ object Main extends IOApp {
     import cats._
     import cats.implicits._
 
-    val lines: Stream[IO, String] =
-      Stream.fixedDelay[IO](1.second).zipRight(Stream.emits[IO, String]("lol" :: "http" :: Nil))
+    // val lines: Stream[IO, String] =
+    //   Stream.fixedDelay[IO](1.second).zipRight(Stream.emits[IO, String]("lol" :: "http" :: Nil))
 
     val stream = for {
       parsed   <- parse(query)
@@ -49,7 +49,7 @@ object Main extends IOApp {
       _ = println("analysis ok")
       rootStage = toStage(analyzed)
       _ = println("planning ok")
-      stream = toStream(rootStage, lines)
+      stream = toStream(rootStage)
     } yield stream
 
     import fs2._
