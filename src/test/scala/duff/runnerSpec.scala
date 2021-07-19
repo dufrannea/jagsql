@@ -22,21 +22,27 @@ import scala.concurrent.duration._
 // - dataflow migration handling
 
 class runnerSpec extends RunnerDsl {
+  val sourceList = "lol" :: "http" :: Nil
 
   given lines: Stream[IO, String] =
-    Stream
-      .fixedDelay[IO](1.milli)
-      .zipRight(Stream.emits[IO, String]("lol" :: "http" :: Nil))
-      .onFinalize(IO(println("** lines done")))
+    Stream.emits(sourceList).metered(1.milli)
+      // .fixedDelay[IO](1.milli)
+      // .zipRight(Stream.emits[IO, String](sourceList))
+      // .onFinalize(IO(println("** lines done")))
 
-  // "SELECT in.col_0 FROM STDIN" evalsTo Vector(
-  //   Row(List(("col_0", Value.VString("lol")))),
-  //   Row(List(("col_0", Value.VString("http"))))
-  // )
-
-  "SELECT in.col_0 FROM STDIN AS in JOIN STDIN AS out ON true" evalsTo Vector(
-    Row(List(("col_0", Value.VString("lol"))))
+  "SELECT in.col_0 FROM STDIN" evalsTo Vector(
+    Row(List(("col_0", Value.VString("lol")))),
+    Row(List(("col_0", Value.VString("http"))))
   )
+
+  "SELECT in.col_0, out.col_0 AS col_1 FROM STDIN AS in JOIN (SELECT zitch.col_0 FROM STDIN AS zitch) AS out ON true" evalsTo
+    sourceList
+      .flatMap(i => sourceList.map(j => i -> j))
+      .map { case (i, j) =>
+        val l = List(("col_0", Value.VString(i)), ("col_1", Value.VString(j)))
+        Row(l)
+      }
+      .toVector
 }
 
 object Didier extends IOApp {

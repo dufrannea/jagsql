@@ -28,6 +28,7 @@ import scala.concurrent.duration._
 object Didier extends IOApp {
 
   import scala.concurrent.duration._
+
   // import fs2.concurrent.PersistentTopic
 
   def run(args: List[String]): IO[ExitCode] = {
@@ -41,25 +42,29 @@ object Didier extends IOApp {
     // Stream.constant("lol")
     val stdin = count.take(5).noneTerminate.onFinalize(IO(println("stinconsumed")))
 
-    def subscribe(t: PersistentTopic[IO, Option[String]], channelName: String): Stream[IO, String] =
-      t.subscribe(100).unNoneTerminate
-      // Stream
-      //   .fromQueueNoneTerminated(t)
+    def subscribe_(t: PersistentTopic[IO, Option[String]], channelName: String): Stream[IO, String] =
+      Stream.eval(log(s"New subs $channelName")) *> t.subscribe(100)
+        .unNoneTerminate
+        // Stream
+        //   .fromQueueNoneTerminated(t)
         .evalMap(i => log(s"$channelName = go $i") *> IO.pure(s"$channelName- $i"))
+
+    def subscribe(t: Any, channelName: Any): Stream[IO, String] = stdin.unNoneTerminate
 
     for {
       topic <- PersistentTopic[IO, Option[String]]
       _     <- log("didier")
       emitStdin = stdin
                     .covary[IO]
-                    .metered(1.second)
+                    // .through(topic.publish)
+                    // .metered(1.second)
                     .evalMap(i => IO(println(s"published $i")) *> topic.publish1(i))
-      stuff = subscribe(topic, "c1")
-                .flatMap(x => Stream.eval(log("kewl")) *> subscribe(topic, "c2").map(y => x -> y))
+      stuff = subscribe_(topic, "c1")
+                .flatMap(x => Stream.eval(log(s"kewl $x")) *> subscribe_(topic, "c2").map(y => x -> y))
                 .evalMap(a => log(a.toString))
       _     <-
         emitStdin
-          .concurrently(
+          .mergeHaltR(
             stuff
           )
           .compile

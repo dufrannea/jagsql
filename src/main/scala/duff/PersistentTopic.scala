@@ -102,7 +102,7 @@ object PersistentTopic {
   /** Constructs a PersistentTopic */
   def apply[F[_], A](implicit F: Concurrent[F]): F[PersistentTopic[F, A]] =
     (
-      F.ref((LongMap.empty[Channel[F, A]], 1L, Queue.empty[A])),
+      F.ref((LongMap.empty[(Channel[F, A], Int)], 1L, Queue.empty[A])),
       SignallingRef[F, Int](0),
       F.deferred[Unit]
     ).mapN { case (state, subscriberCount, signalClosure) =>
@@ -111,15 +111,37 @@ object PersistentTopic {
         def foreach[B](lm: LongMap[B])(f: B => F[Unit]) =
           lm.foldLeft(F.unit) { case (op, (_, b)) => op >> f(b) }
 
+        // split publish to have an update function that
+        // does only publication
+        // publication is called after all subscriptions and 
+        // all message publications, so we are sure all is sent.
+        // Question is: are in order ?
         def publish1(a: A): F[Either[PersistentTopic.Closed, Unit]] =
-          state.update { case (subs, id, backlog) => (subs, id, backlog.enqueue(a)) } *>
-            signalClosure.tryGet.flatMap {
-              case Some(_) => PersistentTopic.closed.pure[F]
-              case None    =>
-                state
-                  .get
-                  .flatMap { case (subs, _, _) => foreach(subs)(_.send(a).void) }
-                  .as(PersistentTopic.rightUnit)
+          state
+            .modify { case (subs, id, backlog) =>
+              val newBacklog = backlog.enqueue(a)
+              val backlogSize = newBacklog.size
+
+              val toSend = subs.map { case (i, (channel, lastChanIndex)) =>
+                i -> (channel, (lastChanIndex, backlogSize))
+              }
+              (
+                (subs.map { case (id, (chan, _)) => id -> (chan, backlogSize) }, id, newBacklog),
+                (newBacklog, toSend)
+              )
+            }
+            .flatMap { case (backlog, chansIndexes) =>
+              signalClosure.tryGet.flatMap {
+                case Some(_) => PersistentTopic.closed.pure[F]
+                case None    =>
+                  foreach(chansIndexes) { case (channel, (from, to)) =>
+                    val log =
+                      F.pure(println(s"sending indexes $from $to ${backlog.slice(from, to)} [Backlog is ${backlog}]"))
+
+                    log *> backlog.slice(from, to).toList.traverse_(queuedItem => channel.send(queuedItem).void)
+                  }
+                    .as(PersistentTopic.rightUnit)
+              }
             }
 
         def subscribeAwait(maxQueued: Int): Resource[F, Stream[F, A]] =
@@ -128,12 +150,13 @@ object PersistentTopic {
             .flatMap { chan =>
               val subscribe = state
                 .modify { case (subs, id, backlog) =>
-                  ((subs.updated(id, chan), id + 1, backlog), (id, backlog))
+                  ((subs.updated(id, (chan, 0)), id + 1, backlog), (id, backlog))
                 }
-                .flatMap { case (id, backlog) =>
-                  println(s"backlog $backlog")
-                  backlog.traverse(chan.send) *> F.pure(id)
-                } <* subscriberCount.update(_ + 1)
+                .map(_._1) <* subscriberCount.update(_ + 1)
+              // .flatMap { case (id, backlog) =>
+              //   // println(s"subscription with $backlog")
+              //   backlog.traverse(chan.send) *> F.pure(id)
+              // }
 
               def unsubscribe(id: Long) =
                 state.modify { case (subs, nextId, backlog) =>
@@ -142,7 +165,7 @@ object PersistentTopic {
                   // publish loop which might have already enqueued
                   // something.
                   def drainChannel: F[Unit] =
-                    subs.get(id).traverse_ { chan =>
+                    subs.get(id).traverse_ { case (chan, isOpen) =>
                       chan.close >> chan.stream.compile.drain
                     }
 
@@ -174,7 +197,7 @@ object PersistentTopic {
 
               state
                 .get
-                .flatMap { case (subs, _, backlog) => foreach(subs)(_.close.void) }
+                .flatMap { case (subs, _, backlog) => foreach(subs)(_._1.close.void) }
                 .as(result)
             }
             .uncancelable
