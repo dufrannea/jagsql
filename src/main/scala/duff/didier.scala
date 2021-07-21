@@ -40,7 +40,7 @@ object Didier extends IOApp {
     // val stdin = timer.zipRight(Stream.constant("lol"))
     val count = Stream.unfold(0)(i => Some((i, i + 1))).map(_.toString).covary[IO]
     // Stream.constant("lol")
-    val stdin = count.take(5).noneTerminate.onFinalize(IO(println("stinconsumed")))
+    val stdin = count.take(10).noneTerminate.onFinalize(IO(println("stinconsumed")))
 
     def subscribe_(t: PersistentTopic[IO, Option[String]], channelName: String): Stream[IO, String] =
       Stream.eval(log(s"New subs $channelName")) *> t.subscribe(100)

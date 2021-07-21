@@ -5,6 +5,7 @@ import fs2.concurrent._
 
 import cats.effect._
 import cats.effect.implicits._
+
 import cats.syntax.all._
 import scala.collection.immutable.LongMap
 
@@ -96,16 +97,27 @@ object PersistentTopic {
 
   import scala.collection.immutable.Queue
 
+  class AChannel
+
   type Closed = Closed.type
   object Closed
+
+  case class PublishRange(from: Int, to: Int)
+  case class PublishMessage(chan: AChannel, range: PublishRange)
+
+  enum ChannelStatus {
+    // case Reserved(range: PublishRange)
+    case Free(at: Int)
+  }
 
   /** Constructs a PersistentTopic */
   def apply[F[_], A](implicit F: Concurrent[F]): F[PersistentTopic[F, A]] =
     (
-      F.ref((LongMap.empty[(Channel[F, A], Int)], 1L, Queue.empty[A])),
+      F.ref((Map.empty[AChannel, ChannelStatus], 1L, Queue.empty[A])),
       SignallingRef[F, Int](0),
-      F.deferred[Unit]
-    ).mapN { case (state, subscriberCount, signalClosure) =>
+      F.deferred[Unit],
+      FilteredQueue.empty[F, PublishMessage]
+    ).mapN { case (state, subscriberCount, signalClosure, publishQueue) =>
       new PersistentTopic[F, A] {
 
         def foreach[B](lm: LongMap[B])(f: B => F[Unit]) =
@@ -113,7 +125,7 @@ object PersistentTopic {
 
         // split publish to have an update function that
         // does only publication
-        // publication is called after all subscriptions and 
+        // publication is called after all subscriptions and
         // all message publications, so we are sure all is sent.
         // Question is: are in order ?
         def publish1(a: A): F[Either[PersistentTopic.Closed, Unit]] =
@@ -122,59 +134,80 @@ object PersistentTopic {
               val newBacklog = backlog.enqueue(a)
               val backlogSize = newBacklog.size
 
-              val toSend = subs.map { case (i, (channel, lastChanIndex)) =>
-                i -> (channel, (lastChanIndex, backlogSize))
+              println(s"PersistentTopic: published value $a, backlog is now $newBacklog")
+
+              val toSend = subs.toList.map { case (channel, ChannelStatus.Free(at)) =>
+                PublishMessage(channel, PublishRange(at, backlogSize))
               }
+
+              val nSubs = subs.map { case (chan, status) => chan -> ChannelStatus.Free(backlogSize) }
               (
-                (subs.map { case (id, (chan, _)) => id -> (chan, backlogSize) }, id, newBacklog),
+                (nSubs, id, newBacklog),
                 (newBacklog, toSend)
               )
             }
-            .flatMap { case (backlog, chansIndexes) =>
-              signalClosure.tryGet.flatMap {
-                case Some(_) => PersistentTopic.closed.pure[F]
-                case None    =>
-                  foreach(chansIndexes) { case (channel, (from, to)) =>
-                    val log =
-                      F.pure(println(s"sending indexes $from $to ${backlog.slice(from, to)} [Backlog is ${backlog}]"))
-
-                    log *> backlog.slice(from, to).toList.traverse_(queuedItem => channel.send(queuedItem).void)
-                  }
-                    .as(PersistentTopic.rightUnit)
-              }
+            .flatMap { case (_, publishMessages) =>
+              F.pure(println(s">>> publishing in queue $publishMessages")) *>
+                publishMessages.traverse_(publishQueue.offer)
             }
+            .as(PersistentTopic.rightUnit)
 
         def subscribeAwait(maxQueued: Int): Resource[F, Stream[F, A]] =
+          // Resource
+          //   .eval(Channel.bounded[F, A](maxQueued))
           Resource
-            .eval(Channel.bounded[F, A](maxQueued))
-            .flatMap { chan =>
-              val subscribe = state
-                .modify { case (subs, id, backlog) =>
-                  ((subs.updated(id, (chan, 0)), id + 1, backlog), (id, backlog))
+            .eval(F.pure(new AChannel))
+            .evalMap { case chan =>
+              // publish before setting in the state
+              state.get.flatMap { case (_, _, backlog) =>
+                (if (backlog.size != 0)
+                   publishQueue.offer(PublishMessage(chan, PublishRange(0, backlog.size)))
+                 else F.unit).as(chan -> backlog.size)
+              }
+            }
+            .flatMap { (chan, lastIndex) =>
+              val subscribe: F[AChannel] = state
+                .update { case (subs, id, backlog) =>
+                  val nsubs = subs.updated(chan, ChannelStatus.Free(lastIndex))
+                  println(s"Adding channel $chan to channels, now are $nsubs")
+                  ((nsubs, id + 1, backlog))
                 }
-                .map(_._1) <* subscriberCount.update(_ + 1)
-              // .flatMap { case (id, backlog) =>
-              //   // println(s"subscription with $backlog")
-              //   backlog.traverse(chan.send) *> F.pure(id)
-              // }
+                .as(chan) <* subscriberCount.update(_ + 1)
 
-              def unsubscribe(id: Long) =
+              def unsubscribe(chan: AChannel) =
                 state.modify { case (subs, nextId, backlog) =>
-                  // _After_ we remove the bounded channel for this
-                  // subscriber, we need to drain it to unblock to
-                  // publish loop which might have already enqueued
-                  // something.
-                  def drainChannel: F[Unit] =
-                    subs.get(id).traverse_ { case (chan, isOpen) =>
-                      chan.close >> chan.stream.compile.drain
-                    }
+                  // you should make sure there is no channel request in the queue
+                  // or you will block the others
+                  // def drainChannel: F[Unit] =
+                  // here do something clever to purge the
+                  // queue
+                  //  publishQueue.take
+                  // subs.get(chan).traverse_ { case (chan, isOpen) =>
+                  //   chan.close >> chan.stream.compile.drain
+                  // }
 
-                  (subs - id, nextId, backlog) -> drainChannel
+                  (subs - chan, nextId, backlog) -> F.unit
                 }.flatten >> subscriberCount.update(_ - 1)
+
+              def s(a: AChannel): Stream[F, A] = publishQueue
+                .toStream { case PublishMessage(chan, message) =>
+                  chan == a
+                }
+                .evalMap { case PublishMessage(chan, PublishRange(from, to)) =>
+                  F.pure(println(s"Got message for chan $chan ($from, $to)")) *> state.get.map { case (_, _, backlog) =>
+                    val d = backlog.slice(from, to)
+                    println(s" # emitting $d")
+                    Stream.emits(d)
+                  }
+                }
+                .flatten
+                .evalMap { case m => F.pure(println(s"zzzz $m")) *> F.pure(m) }
+
+              println(s"PersistentTopic: new subscription $chan")
 
               Resource
                 .make(subscribe)(unsubscribe)
-                .as(chan.stream)
+                .map(s)
             }
 
         def publish: Pipe[F, A, INothing] = { in =>
@@ -192,13 +225,15 @@ object PersistentTopic {
         def close: F[Either[PersistentTopic.Closed, Unit]] =
           signalClosure
             .complete(())
-            .flatMap { completedNow =>
+            .map { completedNow =>
               val result = if (completedNow) PersistentTopic.rightUnit else PersistentTopic.closed
+              result
 
-              state
-                .get
-                .flatMap { case (subs, _, backlog) => foreach(subs)(_._1.close.void) }
-                .as(result)
+            // state
+            //   .get
+            //   .flatMap { case (subs, _, backlog) => foreach(subs)(_._1.close.void) }
+            //   .as(result)
+            // ???
             }
             .uncancelable
 
