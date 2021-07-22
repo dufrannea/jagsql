@@ -1,4 +1,4 @@
-package duff
+package duff.jagsql
 package ast
 
 import cst.Expression

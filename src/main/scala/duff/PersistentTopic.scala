@@ -1,4 +1,4 @@
-package duff
+package duff.jagsql
 
 import fs2._
 import fs2.concurrent._

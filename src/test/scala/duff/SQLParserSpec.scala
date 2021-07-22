@@ -1,18 +1,20 @@
-package duff
+package duff.jagsql
+
+import cst._
+import cst.Expression._
+import cst.Literal._
+import cst.Statement._
+import cst.Source._
+import SQLParser._
 
 import cats.data.NonEmptyList
 import cats.parse.Parser
-import duff.cst._
-import duff.cst.Expression._
-import duff.cst.Literal._
-import duff.cst.Statement._
-import duff.cst.Source._
-import duff.SQLParser._
+
 import org.scalatest.freespec.AnyFreeSpec
 import org.scalatest.matchers.should.Matchers
+import org.scalactic.anyvals.NonEmptyMap
 
 import scala.language.postfixOps
-import org.scalactic.anyvals.NonEmptyMap
 
 class SQLParserSpec extends SqlParserTestDsl {
 
@@ -63,9 +65,9 @@ class SQLParserSpec extends SqlParserTestDsl {
 
     "Operator precedence" - {
 
-      "1 + 1 * 2" parses 
-      
-      "1 * 2 + 1" parses 
+      "1 + 1 * 2" parses
+
+      "1 * 2 + 1" parses
 
     }
   }

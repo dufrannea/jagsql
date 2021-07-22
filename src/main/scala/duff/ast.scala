@@ -1,7 +1,6 @@
-package duff
+package duff.jagsql
 package ast
 
-// import ast._
 import utils._
 import cst.Operator
 

@@ -1,5 +1,4 @@
-package duff
-package grepql
+package duff.jagsql
 
 import cats.effect.IO
 import cats.effect.IOApp

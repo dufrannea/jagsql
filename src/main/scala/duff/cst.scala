@@ -1,4 +1,4 @@
-package duff
+package duff.jagsql
 package cst
 
 import cats.data
@@ -9,7 +9,7 @@ import Literal.StringLiteral
 
 import java.nio.file.Path
 import scala.math.BigDecimal
-import duff.cst.Projection
+import cst.Projection
 
 enum Literal {
   case StringLiteral(a: String)

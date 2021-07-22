@@ -1,4 +1,4 @@
-package duff
+package duff.jagsql
 
 import cats._
 import cats.implicits._

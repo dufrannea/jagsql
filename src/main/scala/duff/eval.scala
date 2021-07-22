@@ -1,10 +1,10 @@
-package duff
+package duff.jagsql
 package eval
 
 import ast._
+import cst.Literal
 import utils._
 
-import duff.cst.Literal
 import cats._
 import cats.implicits._
 import cats.data.Reader
