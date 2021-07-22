@@ -134,8 +134,6 @@ object PersistentTopic {
               val newBacklog = backlog.enqueue(a)
               val backlogSize = newBacklog.size
 
-              println(s"PersistentTopic: published value $a, backlog is now $newBacklog")
-
               val toSend = subs.toList.map { case (channel, ChannelStatus.Free(at)) =>
                 PublishMessage(channel, PublishRange(at, backlogSize))
               }
@@ -147,8 +145,7 @@ object PersistentTopic {
               )
             }
             .flatMap { case (_, publishMessages) =>
-              F.pure(println(s">>> publishing in queue $publishMessages")) *>
-                publishMessages.traverse_(publishQueue.offer)
+              publishMessages.traverse_(publishQueue.offer)
             }
             .as(PersistentTopic.rightUnit)
 
@@ -169,7 +166,6 @@ object PersistentTopic {
               val subscribe: F[AChannel] = state
                 .update { case (subs, id, backlog) =>
                   val nsubs = subs.updated(chan, ChannelStatus.Free(lastIndex))
-                  println(s"Adding channel $chan to channels, now are $nsubs")
                   ((nsubs, id + 1, backlog))
                 }
                 .as(chan) <* subscriberCount.update(_ + 1)
@@ -194,16 +190,12 @@ object PersistentTopic {
                   chan == a
                 }
                 .evalMap { case PublishMessage(chan, PublishRange(from, to)) =>
-                  F.pure(println(s"Got message for chan $chan ($from, $to)")) *> state.get.map { case (_, _, backlog) =>
+                  state.get.map { case (_, _, backlog) =>
                     val d = backlog.slice(from, to)
-                    println(s" # emitting $d")
                     Stream.emits(d)
                   }
                 }
                 .flatten
-                .evalMap { case m => F.pure(println(s"zzzz $m")) *> F.pure(m) }
-
-              println(s"PersistentTopic: new subscription $chan")
 
               Resource
                 .make(subscribe)(unsubscribe)

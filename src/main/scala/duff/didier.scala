@@ -43,7 +43,8 @@ object Didier extends IOApp {
     val stdin = count.take(10).noneTerminate.onFinalize(IO(println("stinconsumed")))
 
     def subscribe_(t: PersistentTopic[IO, Option[String]], channelName: String): Stream[IO, String] =
-      Stream.eval(log(s"New subs $channelName")) *> t.subscribe(100)
+      Stream.eval(log(s"New subs $channelName")) *> t
+        .subscribe(100)
         .unNoneTerminate
         // Stream
         //   .fromQueueNoneTerminated(t)

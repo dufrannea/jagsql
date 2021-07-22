@@ -14,7 +14,7 @@ enum Stage {
 }
 
 def toStage(source: ast.Source): Stage = source match {
-  case Source.StdIn(_)                 => Stage.ReadStdIn
+  case Source.StdIn(_)               => Stage.ReadStdIn
   case Source.SubQuery(statement, _) => toStage(statement)
   case Source.TableRef(_, _)         => sys.error("TableRef not supported")
 }

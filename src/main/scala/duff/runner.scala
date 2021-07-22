@@ -32,14 +32,8 @@ def toStream(s: Stage, stdInLines: Stream[IO, String] = defaultStdInLines): fs2.
       .map(line => Row(List(("col_0", Value.VString(line)))))
       .noneTerminate
       .through(
-        // IO(print(s"published $v | ")) *>
-        topic
-          .publish
+        topic.publish
       )
-  // .through(topic.publish)
-  // .onComplete {
-  //   Stream.eval(IO(println("Publishing None")) *> topic.publish1(None))
-  // }
 
   def toStream0(s: Stage, topic: PersistentTopic[IO, Option[Row]], name: Option[String] = None): fs2.Stream[IO, Row] =
     s match {
@@ -48,12 +42,10 @@ def toStream(s: Stage, stdInLines: Stream[IO, String] = defaultStdInLines): fs2.
           .subscribe(10)
           .evalMap(k =>
             IO {
-              // println(s"$name > dequeued $k")
               k
             }
           )
           .unNoneTerminate
-      // .onFinalize(IO(println(s"### subscription done $name")))
       case Stage.Projection(projections, source)               =>
         val sourceStream = toStream0(source, topic)
         sourceStream.map { case Row(cols) =>
@@ -75,20 +67,14 @@ def toStream(s: Stage, stdInLines: Stream[IO, String] = defaultStdInLines): fs2.
         val leftStream = toStream0(leftSource, topic, Some("left"))
         val rightStream = toStream0(rightSource, topic, Some("right"))
 
-        // TODO:
-        // this does not work, if right finishes
-        // then left cannot iterate over it again,
-        // there need to be a buffer in memory for the
-        // right join
+        // one option would be to fully store the right stream
+        // in memory, and reiterate on it. Doing so would prevent
+        // from displaying values as soon as possible, so an alternative
+        // approach using a PersistentTopic is used here.
         val crossJoin = for {
-          // rs       <- Stream.eval(rightStream.compile.toList)
-          // -        <- Stream.eval(IO(println("!!!!!!!!")))
-          // rightRow <- Stream.emits(rs)
           leftRow  <- leftStream
           rightRow <- rightStream
-          // -        <- Stream.eval(IO(println("zzzzzzzzzzzzzz")))
           allCols = leftRow.colValues ++ rightRow.colValues
-          // _        <- Stream.eval(IO(println(s"IN STREAM: $allCols")))
         } yield Row(allCols)
 
         maybePredicate match {

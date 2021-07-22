@@ -29,31 +29,35 @@ case class FilteredQueue[F[_], A](state: Ref[F, State[F, A]])(using F: GenConcur
     state
       .modify { case State(queue, takers) =>
         val newTakers = takers + Taker(pred, taker)
-        println(s"FilteredQueue: takeIf, new Takers ${newTakers.size}, queue size ${queue.size}")
         (State(queue, newTakers), taker.get)
       }
       .flatMap(complete => dequeueTakers() *> complete)
   }
 
+  private def takeFirst[A](q: Queue[A], pred: A => Boolean): (Queue[A], Option[A]) = {
+    def go(head: Queue[A], qq: Queue[A]): (Queue[A], Option[A]) =
+      qq.dequeueOption match {
+        case Some((v, nq)) if pred(v) => (head ++ nq, Some(v))
+        case Some((v, nq))            => go(head.enqueue(v), nq)
+        case None                     => (head, None)
+      }
+
+    go(Queue.empty[A], q)
+  }
+
   // a successful take might enable other takes
   private def dequeueTakers() = {
-    def go(q: Queue[A], takers: Set[Taker[F, A]]): (Queue[A], Set[Taker[F, A]], List[(Taker[F, A], A)]) = {
-      q.headOption match {
-        case Some(a) =>
-          val maybeTaker = takers.find { case Taker(pred, _) => pred(a) }
-          maybeTaker match {
-            case None    => (q, takers, Nil)
-            case Some(t) =>
-              val (v, nq) = q.dequeue
-              val nt = takers - t
-
-              val (za, zi, l) = go(nq, nt)
-              val dequeuedTakers = (t, v) :: l
-              println(s"FilteredQueue: dequeued Takers ${dequeuedTakers.size}, takers left: ${zi.size}")
-              (za, zi, dequeuedTakers)
-          }
-        case None    => (q, takers, Nil)
+    def go(q: Queue[A], t: Set[Taker[F, A]]): (Queue[A], Set[Taker[F, A]], List[(Taker[F, A], A)]) = {
+      val (queue, takers, offers) = t.toList.foldLeft((q, List.empty[Taker[F, A]], List.empty[(Taker[F, A], A)])) {
+        case ((queue, takerz, result), currentTaker) =>
+          val (nq, maybeFound) = takeFirst(queue, currentTaker.pred)
+          val newTakers =
+            if (maybeFound.isEmpty)
+              currentTaker :: takerz
+            else takerz
+          (nq, newTakers, maybeFound.map(currentTaker -> _).toList ++ result)
       }
+      (queue, takers.toSet, offers)
     }
 
     state.modify { case State(queue, takers) =>
