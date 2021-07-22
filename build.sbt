@@ -21,7 +21,6 @@ lazy val root = project
     libraryDependencies += "co.fs2" % "fs2-core_3" % "3.0.4",
     libraryDependencies += "co.fs2" % "fs2-io_3" % "3.0.4",
     test / envVars := Map("SCALACTIC_FILL_FILE_PATHNAMES" -> "yes"),
-    test / testForkedParallel := true,
     scalacOptions ++= Seq(
       "-deprecation", // Emit warning and location for usages of deprecated APIs.
       "-encoding",
