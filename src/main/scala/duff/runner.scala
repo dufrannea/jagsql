@@ -1,17 +1,16 @@
 package duff.jagsql
 package runner
 
+import cats._
+import cats.effect._
+import fs2.Stream
+import fs2.io._
+import fs2.text
+
 import ast.Expression
 import ast.Projection
 import eval._
 import planner._
-
-import cats._
-import cats.effect._
-
-import fs2.Stream
-import fs2.text
-import fs2.io._
 
 case class Row(colValues: List[(String, Value)])
 

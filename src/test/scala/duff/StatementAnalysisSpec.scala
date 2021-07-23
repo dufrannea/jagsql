@@ -1,17 +1,16 @@
 package duff.jagsql
 package ast
 
-import utils._
-import SQLParser.selectStatement
-
+import cats.data.NonEmptyList
+import cats.data.NonEmptyMap
 import org.scalatest
 import org.scalatest.freespec.AnyFreeSpec
 import org.scalatest.matchers.should.Matchers
 
-import cats.data.NonEmptyList
-import cats.data.NonEmptyMap
-
 import scala.language.postfixOps
+
+import utils._
+import SQLParser.selectStatement
 
 class StatementAnalysisSpec extends StatementAnalysisDsl:
 

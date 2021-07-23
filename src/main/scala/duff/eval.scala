@@ -1,14 +1,14 @@
 package duff.jagsql
 package eval
 
+import cats._
+import cats.data.Kleisli
+import cats.data.Reader
+import cats.implicits._
+
 import ast._
 import cst.Literal
 import utils._
-
-import cats._
-import cats.implicits._
-import cats.data.Reader
-import cats.data.Kleisli
 
 enum Value {
   case VString(e: String)

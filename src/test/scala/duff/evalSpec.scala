@@ -1,20 +1,19 @@
 package duff.jagsql
 package eval
 
+import cats._
+import cats.data.State
+import cats.implicits._
+import org.scalatest
+import org.scalatest.freespec.AnyFreeSpec
+import org.scalatest.matchers.should.Matchers
+
+import scala.language.postfixOps
+
 import ast._
 import cst.Expression
 import cst.Literal
 import SQLParser.expression
-
-import org.scalatest.freespec.AnyFreeSpec
-import org.scalatest.matchers.should.Matchers
-import org.scalatest
-
-import cats.data.State
-import cats._
-import cats.implicits._
-
-import scala.language.postfixOps
 
 class evalSpec extends EvalDsl:
   "1" evaluatesTo Value.VNumber(BigDecimal(1)) 

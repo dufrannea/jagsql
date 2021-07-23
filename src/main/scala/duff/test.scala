@@ -3,7 +3,6 @@ package duff.jagsql
 import cats._
 import cats.effect._
 import cats.implicits._
-
 import fs2._
 
 object Test extends IOApp {

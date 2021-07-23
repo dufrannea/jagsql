@@ -1,15 +1,16 @@
 package duff.jagsql
 
+import cats._
+import cats.effect.ExitCode
 import cats.effect.IO
 import cats.effect.IOApp
-import cats._
 import cats.implicits._
-import runner._
+import fs2._
 
 import scala.collection.immutable.ArraySeq
-import cats.effect.ExitCode
-import fs2._
 import scala.concurrent.duration._
+
+import runner._
 
 object Main extends IOApp {
 

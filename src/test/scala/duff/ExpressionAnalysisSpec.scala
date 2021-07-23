@@ -1,18 +1,17 @@
 package duff.jagsql
 package ast
 
+import cats.data.State
+import org.scalatest
+import org.scalatest.freespec.AnyFreeSpec
+import org.scalatest.matchers.should.Matchers
+
+import scala.language.postfixOps
+
 import cst.Expression
 import cst.Literal
 import SQLParser.expression
 import utils._
-
-import cats.data.State
-
-import org.scalatest.freespec.AnyFreeSpec
-import org.scalatest.matchers.should.Matchers
-import org.scalatest
-
-import scala.language.postfixOps
 
 class ExpressionAnalysisSpec extends AnalysisDsl:
 

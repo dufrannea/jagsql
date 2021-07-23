@@ -1,15 +1,14 @@
 package duff.jagsql
 
 import cats._
-import cats.implicits._
 import cats.effect._
 import cats.effect.std.Queue
-
+import cats.implicits._
 import fs2._
 
-import eval._
-
 import scala.concurrent.duration._
+
+import eval._
 
 object Example extends IOApp {
 

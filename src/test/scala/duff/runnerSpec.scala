@@ -2,19 +2,17 @@ package duff.jagsql
 package runner
 
 import cats._
-import cats.implicits._
 import cats.effect._
 import cats.effect.unsafe.IORuntime
-
+import cats.implicits._
 import fs2._
-
-import eval._
-
 import org.scalatest._
 import org.scalatest.freespec.AnyFreeSpec
 import org.scalatest.matchers.should.Matchers
 
 import scala.concurrent.duration._
+
+import eval._
 
 // # personal objectives
 // - articles, blog post

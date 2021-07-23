@@ -1,21 +1,21 @@
 package duff.jagsql
 
-import cst._
-import Expression._
-import Statement._
-
 import cats.data.NonEmptyList
-import cats.parse.Parser
 import cats.implicits._
+import cats.parse.Parser
 import cats.parse.Parser0
 import cats.syntax.align
 
 import scala.math.BigDecimal
 import scala.math.exp
-import scala.util.matching.Regex
 import scala.util.Failure
 import scala.util.Success
 import scala.util.Try
+import scala.util.matching.Regex
+
+import cst._
+import Expression._
+import Statement._
 
 object SQLParser {
   case class Position(from: Int, to: Int)

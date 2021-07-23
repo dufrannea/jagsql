@@ -1,17 +1,17 @@
 package duff.jagsql
 package ast
 
-import utils._
-import cst.Operator
-
 import cats._
-import cats.implicits._
 import cats.data.NonEmptyList
 import cats.data.NonEmptyMap
+import cats.data.State
+import cats.implicits._
 
 import scala.language.experimental
 import scala.util.Try
-import cats.data.State
+
+import utils._
+import cst.Operator
 
 enum SimpleType {
   case Number

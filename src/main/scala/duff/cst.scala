@@ -3,12 +3,13 @@ package cst
 
 import cats.data
 import cats.data.NonEmptyList
-import Literal.NumberLiteral
-import Literal.RegexLiteral
-import Literal.StringLiteral
 
 import java.nio.file.Path
 import scala.math.BigDecimal
+
+import Literal.NumberLiteral
+import Literal.RegexLiteral
+import Literal.StringLiteral
 import cst.Projection
 
 enum Literal {

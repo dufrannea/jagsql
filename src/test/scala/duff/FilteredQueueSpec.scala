@@ -1,17 +1,15 @@
 package duff.jagsql
 
 import cats._
-import cats.implicits._
 import cats.effect._
-
+import cats.implicits._
 import fs2._
-
+import org.scalatest
 import org.scalatest.freespec.AnyFreeSpec
 import org.scalatest.matchers.should.Matchers
-import org.scalatest
 
-import scala.language.postfixOps
 import scala.concurrent.duration._
+import scala.language.postfixOps
 
 class FilteredQueueSpec extends AnyFreeSpec with Matchers {
   import cats.effect.unsafe.implicits.global

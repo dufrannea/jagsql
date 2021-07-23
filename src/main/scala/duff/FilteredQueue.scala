@@ -1,12 +1,12 @@
 package duff.jagsql
 
 import cats._
-import cats.implicits._
 import cats.effect._
-
 import cats.effect.kernel.GenConcurrent
-import scala.collection.immutable.Queue
+import cats.implicits._
 import fs2._
+
+import scala.collection.immutable.Queue
 
 object FilteredQueue {
   private def emptyState[F[_], A](using g: GenConcurrent[F, _]): F[Ref[F, State[F, A]]] =
