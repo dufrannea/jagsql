@@ -1,5 +1,5 @@
 package duff.jagsql
-package utils
+package std
 
 import cats._
 import cats.implicits._

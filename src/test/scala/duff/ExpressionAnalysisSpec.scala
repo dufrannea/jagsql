@@ -11,7 +11,7 @@ import scala.language.postfixOps
 import cst.Expression
 import cst.Literal
 import SQLParser.expression
-import utils._
+import std._
 
 class ExpressionAnalysisSpec extends AnalysisDsl:
 

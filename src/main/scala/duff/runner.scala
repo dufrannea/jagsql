@@ -3,6 +3,7 @@ package runner
 
 import cats._
 import cats.effect._
+import duff.jagsql.std.PersistentTopic
 import fs2.Stream
 import fs2.io._
 import fs2.text

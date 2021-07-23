@@ -1,4 +1,5 @@
 package duff.jagsql
+package std
 
 import cats._
 import cats.effect._
