@@ -13,8 +13,7 @@ lazy val root = project
     libraryDependencies += "org.typelevel" %% "cats-parse" % "0.3.4",
     libraryDependencies += "org.typelevel" %% "cats-effect" % "3.1.1",
     libraryDependencies += "co.fs2" %% "fs2-core" % "3.0.4",
-    // libraryDependencies += ("com.monovore" %% "decline" % "1.3.0")
-      // .cross(CrossVersion.for3Use2_13),
+    libraryDependencies += "com.monovore" %% "decline" % "2.1.0",
     libraryDependencies += scalaTest % Test,
     libraryDependencies += "org.scalatest" %% "scalatest-freespec" % "3.2.9" % Test,
     libraryDependencies += "com.novocode" % "junit-interface" % "0.11" % "test",

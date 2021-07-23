@@ -1,46 +1,43 @@
 package duff.jagsql
 
 import cats._
+import cats.data.State
 import cats.effect.ExitCode
 import cats.effect.IO
 import cats.effect.IOApp
 import cats.implicits._
+import com.monovore.decline.Command
+import com.monovore.decline.CommandApp
+import com.monovore.decline.Opts
 import fs2._
 
 import scala.collection.immutable.ArraySeq
 import scala.concurrent.duration._
 
+import SQLParser.parse
+import ast.analyzeStatement
+import ast.Scope
+import planner.toStage
+import runner.toStream
 import runner._
 
 object Main extends IOApp {
 
-  def run(mainArgs: List[String]): IO[ExitCode] = {
-    mainArgs.toList match {
-      case query :: Nil => go(query) *> IO.pure(ExitCode.Success)
-      case _            =>
-        // IO.raiseError(new Throwable(s"Error, you should pass only a query, got $mainArgs"))
+  private val options = Opts.option[String]("query", "Input query")
 
-        Stream
-          .fixedDelay[IO](1.second)
-          .zipRight(Stream.emits[IO, String]("lol" :: "http" :: "lala" :: "lili" :: Nil))
-          .evalMap(i => IO(println(i)))
-          .compile
-          .drain *> IO(ExitCode.Success)
-    }
+  private val command = Command("jag", "Execute a sql query from the command line.") {
+    options
   }
 
-  private def go(query: String): IO[List[Row]] = {
-    import SQLParser.parse
-    import ast.analyzeStatement
-    import planner.toStage
-    import runner.toStream
-    import cats.data.State
-    import ast.Scope
-    import cats._
-    import cats.implicits._
+  def run(mainArgs: List[String]): IO[ExitCode] =
+    command.parse(mainArgs) match {
+      case Left(help)   =>
+        IO(System.err.println(help)) *> IO.pure(ExitCode.Error)
+      case Right(query) =>
+        go(query) *> IO(ExitCode.Success)
+    }
 
-    // val lines: Stream[IO, String] =
-    //   Stream.fixedDelay[IO](1.second).zipRight(Stream.emits[IO, String]("lol" :: "http" :: Nil))
+  private def go(query: String): IO[List[Row]] = {
 
     val stream = for {
       parsed   <- parse(query)
@@ -51,9 +48,6 @@ object Main extends IOApp {
       _ = println("planning ok")
       stream = toStream(rootStage)
     } yield stream
-
-    import fs2._
-    import cats.effect._
 
     stream match {
       case Left(e)  => sys.error(e.toString)
