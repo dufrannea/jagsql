@@ -8,15 +8,25 @@ import fs2._
 
 import scala.collection.immutable.Queue
 
+import FilteredQueue.Taker
+import FilteredQueue.State
+
+/** A Queue-like data structures that allows for a consumer to dequeue messages based on a predicate.
+  *
+  * Predicates are supposed to be exclusive between consumers, as messages will be sent to the first matching consumer
+  * only.
+  */
 object FilteredQueue {
+
+  def empty[F[_], A](using g: GenConcurrent[F, _]): F[FilteredQueue[F, A]] = emptyState.map(s => FilteredQueue[F, A](s))
+
   private def emptyState[F[_], A](using g: GenConcurrent[F, _]): F[Ref[F, State[F, A]]] =
     Ref[F].of(State(Queue.empty[A], Set.empty))
 
-  def empty[F[_], A](using g: GenConcurrent[F, _]): F[FilteredQueue[F, A]] = emptyState.map(s => FilteredQueue[F, A](s))
-}
+  private[FilteredQueue] case class Taker[F[_], A](pred: A => Boolean, deferred: Deferred[F, A])
+  private[FilteredQueue] case class State[F[_], A](queue: Queue[A], takers: Set[Taker[F, A]])
 
-case class Taker[F[_], A](pred: A => Boolean, deferred: Deferred[F, A])
-case class State[F[_], A](queue: Queue[A], takers: Set[Taker[F, A]])
+}
 
 case class FilteredQueue[F[_], A](state: Ref[F, State[F, A]])(using F: GenConcurrent[F, _]) {
 
@@ -67,8 +77,6 @@ case class FilteredQueue[F[_], A](state: Ref[F, State[F, A]])(using F: GenConcur
     }.flatten
 
   }
-
-  type State = Ref[F, Queue[A]]
 
   def toStream(pred: A => Boolean): Stream[F, A] =
     Stream.eval[F, A](takeIf(pred)) ++ toStream(pred)
