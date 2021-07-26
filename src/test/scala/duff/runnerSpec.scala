@@ -20,31 +20,34 @@ import eval._
 // - dataflow migration handling
 
 class runnerSpec extends RunnerDsl {
-  val sourceList = "lol" :: "http" :: Nil
+  val sourceList = (1 to 1).map(_.toString).toList
 
   given lines: Stream[IO, String] =
     Stream.emits(sourceList)
 
-  "SELECT in.col_0 FROM STDIN" evalsTo Vector(
-    Row(List(("col_0", Value.VString("lol")))),
-    Row(List(("col_0", Value.VString("http"))))
-  )
+  // "SELECT in.col_0 FROM STDIN" evalsTo (0, Vector(
+  //   Row(List(("col_0", Value.VString("lol")))),
+  //   Row(List(("col_0", Value.VString("http"))))
+  // ))
 
-  "SELECT in.col_0, out.foo AS col_1 FROM STDIN AS in JOIN (SELECT zitch.col_0 AS foo FROM STDIN AS zitch) AS out ON true" evalsTo
+  (1 to 10).foreach { i =>
+    "SELECT in.col_0, out.foo AS col_1 FROM STDIN AS in JOIN (SELECT zitch.col_0 AS foo FROM STDIN AS zitch) AS out ON true" evalsTo (i,
     sourceList
       .flatMap(i => sourceList.map(j => i -> j))
       .map { case (i, j) =>
         val l = List(("col_0", Value.VString(i)), ("col_1", Value.VString(j)))
         Row(l)
       }
-      .toVector
+      .toVector)
+
+  }
 }
 
 trait RunnerDsl extends AnyFreeSpec with Matchers {
   import cats.effect.unsafe.implicits.global
 
   private def evaluate(query: String, stdIn: Stream[IO, String]): IO[Vector[Row]] = {
-    import SQLParser.parse
+    import parser.parse
     import ast.analyzeStatement
     import planner.toStage
     import runner.toStream
@@ -79,11 +82,11 @@ trait RunnerDsl extends AnyFreeSpec with Matchers {
       evaluate(c, stdIn).map(v => require(v == expected))
     }
 
-    def evalsTo(expected: Vector[Row])(using stdIn: Stream[IO, String]) = {
+    def evalsTo(i: Int, expected: Vector[Row])(using stdIn: Stream[IO, String]) = {
       import ast._
 
-      c.toString in {
-        assert(evaluate(c, stdIn).unsafeRunSync() == expected)
+      s"c.toString$i" in {
+        assert(evaluate(c, stdIn).unsafeRunSync() == expected)//.unsafeRunTimed(10.second).getOrElse(sys.error("should not time out")) == expected)
       }
     }
 

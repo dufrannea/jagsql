@@ -14,7 +14,7 @@ import fs2._
 import scala.collection.immutable.ArraySeq
 import scala.concurrent.duration._
 
-import SQLParser.parse
+import parser.parse
 import ast.analyzeStatement
 import ast.Scope
 import planner.toStage

@@ -13,7 +13,7 @@ import scala.language.postfixOps
 import ast._
 import cst.Expression
 import cst.Literal
-import SQLParser.expression
+import parser.expression
 
 class evalSpec extends EvalDsl:
   "1" evaluatesTo Value.VNumber(BigDecimal(1)) 

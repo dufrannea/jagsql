@@ -13,7 +13,7 @@ import cst.Expression._
 import cst.Literal._
 import cst.Statement._
 import cst.Source._
-import SQLParser._
+import parser._
 
 class SQLParserSpec extends SqlParserTestDsl {
 

@@ -10,7 +10,7 @@ import org.scalatest.matchers.should.Matchers
 import scala.language.postfixOps
 
 import std._
-import SQLParser.selectStatement
+import parser.selectStatement
 
 class StatementAnalysisSpec extends StatementAnalysisDsl:
 

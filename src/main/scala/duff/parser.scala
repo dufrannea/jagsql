@@ -17,7 +17,7 @@ import cst._
 import Expression._
 import Statement._
 
-object SQLParser {
+object parser {
   case class Position(from: Int, to: Int)
 
   def indexed[T](p: Parser[T]): Parser[(T, Position)] = (Parser.index.with1 ~ p ~ Parser.index).map {
@@ -285,3 +285,6 @@ object SQLParser {
     println(selectStatement.parse("SELECT /lol/"))
 
 }
+
+export parser.selectStatement
+export parser.literal

@@ -1,6 +1,8 @@
 package duff.jagsql
 package std
 
+import cats._
+import cats.implicits._
 import cats.effect._
 import cats.effect.implicits._
 import cats.syntax.all._
@@ -8,8 +10,24 @@ import fs2._
 import fs2.concurrent._
 
 import scala.collection.immutable.LongMap
+import scala.collection.immutable.Queue
 
-abstract class PersistentTopic[F[_], A] { self =>
+import PersistentTopic._
+
+case class IdPred(a: Long) extends (PublishMessage => Boolean) {
+
+  def apply(x: PublishMessage): Boolean = {
+    x.chan == a
+  }
+
+  override def toString() = {
+    s"IdPred($a)"
+  }
+
+}
+
+abstract class PersistentTopic[F[_]: Concurrent, A] { self =>
+  def status: F[DebugStatus[F, A]]
 
   /** Publishes elements from source of `A` to this topic. [[Pipe]] equivalent of `publish1`. Closes the topic when the
     * input stream terminates. Especially useful when the topic has a single producer.
@@ -77,33 +95,35 @@ abstract class PersistentTopic[F[_], A] { self =>
     * B` and `B
     * => A`.
     */
-  def imap[B](f: A => B)(g: B => A): PersistentTopic[F, B] =
-    new PersistentTopic[F, B] {
-      def publish: Pipe[F, B, Nothing] = sfb => self.publish(sfb.map(g))
-      def publish1(b: B): F[Either[PersistentTopic.Closed, Unit]] = self.publish1(g(b))
-      def subscribe(maxQueued: Int): Stream[F, B] =
-        self.subscribe(maxQueued).map(f)
-      def subscribeAwait(maxQueued: Int): Resource[F, Stream[F, B]] =
-        self.subscribeAwait(maxQueued).map(_.map(f))
-      def subscribers: Stream[F, Int] = self.subscribers
-      def close: F[Either[PersistentTopic.Closed, Unit]] = self.close
-      def isClosed: F[Boolean] = self.isClosed
-      def closed: F[Unit] = self.closed
-    }
+  // def imap[B](f: A => B)(g: B => A): PersistentTopic[F, B] =
+  //   new PersistentTopic[F, B] {
+  //     def status = self.status.map { case (a, b, c) => a -> b.map(f) -> FilteredQueue.State(c.queue.map(f), c.takers.map(taker => taker.)) }
+  //     def publish: Pipe[F, B, Nothing] = sfb => self.publish(sfb.map(g))
+  //     def publish1(b: B): F[Either[PersistentTopic.Closed, Unit]] = self.publish1(g(b))
+  //     def subscribe(maxQueued: Int): Stream[F, B] =
+  //       self.subscribe(maxQueued).map(f)
+  //     def subscribeAwait(maxQueued: Int): Resource[F, Stream[F, B]] =
+  //       self.subscribeAwait(maxQueued).map(_.map(f))
+  //     def subscribers: Stream[F, Int] = self.subscribers
+  //     def close: F[Either[PersistentTopic.Closed, Unit]] = self.close
+  //     def isClosed: F[Boolean] = self.isClosed
+  //     def closed: F[Unit] = self.closed
+  //   }
 
 }
 
 object PersistentTopic {
+  type DebugStatus[F[_], A] = (Map[Long, ChannelStatus], Queue[A], FilteredQueue.State[F, PublishMessage])
 
   import scala.collection.immutable.Queue
-
-  class AChannel
 
   type Closed = Closed.type
   object Closed
 
   case class PublishRange(from: Int, to: Int)
-  case class PublishMessage(chan: AChannel, range: PublishRange)
+  case class PublishMessage(chan: Long, range: PublishRange)
+
+  case class State[A](subs: Map[Long, ChannelStatus], maxIndex: Long, backlog: Queue[A])
 
   enum ChannelStatus {
     // case Reserved(range: PublishRange)
@@ -113,7 +133,7 @@ object PersistentTopic {
   /** Constructs a PersistentTopic */
   def apply[F[_], A](implicit F: Concurrent[F]): F[PersistentTopic[F, A]] =
     (
-      F.ref((Map.empty[AChannel, ChannelStatus], 1L, Queue.empty[A])),
+      F.ref[State[A]](State(Map.empty[Long, ChannelStatus], 1L, Queue.empty[A])),
       SignallingRef[F, Int](0),
       F.deferred[Unit],
       FilteredQueue.empty[F, PublishMessage]
@@ -123,6 +143,11 @@ object PersistentTopic {
         def foreach[B](lm: LongMap[B])(f: B => F[Unit]) =
           lm.foldLeft(F.unit) { case (op, (_, b)) => op >> f(b) }
 
+        def status: F[DebugStatus[F, A]] = (publishQueue.state.get, state.get).mapN {
+          case (queueState, State(a, _, c)) =>
+            (a, c, queueState)
+        }
+
         // split publish to have an update function that
         // does only publication
         // publication is called after all subscriptions and
@@ -130,9 +155,10 @@ object PersistentTopic {
         // Question is: are in order ?
         def publish1(a: A): F[Either[PersistentTopic.Closed, Unit]] =
           state
-            .modify { case (subs, id, backlog) =>
+            .modify { case State(subs, id, backlog) =>
               val newBacklog = backlog.enqueue(a)
               val backlogSize = newBacklog.size
+              println(s"In publish1 $a, subs: $subs")
 
               val toSend = subs.toList.map { case (channel, ChannelStatus.Free(at)) =>
                 PublishMessage(channel, PublishRange(at, backlogSize))
@@ -140,7 +166,7 @@ object PersistentTopic {
 
               val nSubs = subs.map { case (chan, status) => chan -> ChannelStatus.Free(backlogSize) }
               (
-                (nSubs, id, newBacklog),
+                State(nSubs, id, newBacklog),
                 (newBacklog, toSend)
               )
             }
@@ -150,28 +176,33 @@ object PersistentTopic {
             .as(PersistentTopic.rightUnit)
 
         def subscribeAwait(maxQueued: Int): Resource[F, Stream[F, A]] =
-          // Resource
-          //   .eval(Channel.bounded[F, A](maxQueued))
           Resource
-            .eval(F.pure(new AChannel))
-            .evalMap { case chan =>
-              // publish before setting in the state
-              state.get.flatMap { case (_, _, backlog) =>
-                (if (backlog.size != 0)
-                   publishQueue.offer(PublishMessage(chan, PublishRange(0, backlog.size)))
-                 else F.unit).as(chan -> backlog.size)
-              }
+            .eval {
+              state
+                .modify { case State(subs, counter, backlog) =>
+                  // reserve chan id
+                  val chan = counter
+                  (State(subs, chan + 1, backlog), (chan -> backlog.size))
+                }
+                .flatMap { case (chan, backlogSize) =>
+                  // publish messages for channel
+                  if (backlogSize != 0)
+                    F.pure(println(s"first publish for channel $chan")) *>
+                      publishQueue.offer(PublishMessage(chan, PublishRange(0, backlogSize))).as(chan -> backlogSize)
+                  else F.pure((chan, backlogSize))
+                }
             }
             .flatMap { (chan, lastIndex) =>
-              val subscribe: F[AChannel] = state
-                .update { case (subs, id, backlog) =>
+              val subscribe: F[Long] = state
+                .update { case State(subs, id, backlog) =>
+                  // add chan to channels
                   val nsubs = subs.updated(chan, ChannelStatus.Free(lastIndex))
-                  ((nsubs, id + 1, backlog))
+                  (State(nsubs, id, backlog))
                 }
                 .as(chan) <* subscriberCount.update(_ + 1)
 
-              def unsubscribe(chan: AChannel) =
-                state.modify { case (subs, nextId, backlog) =>
+              def unsubscribe(chan: Long) =
+                state.modify { case State(subs, nextId, backlog) =>
                   // you should make sure there is no channel request in the queue
                   // or you will block the others
                   // def drainChannel: F[Unit] =
@@ -182,15 +213,17 @@ object PersistentTopic {
                   //   chan.close >> chan.stream.compile.drain
                   // }
 
-                  (subs - chan, nextId, backlog) -> F.unit
+                  State(subs - chan, nextId, backlog) -> F.unit
                 }.flatten >> subscriberCount.update(_ - 1)
 
-              def s(a: AChannel): Stream[F, A] = publishQueue
-                .toStream { case PublishMessage(chan, message) =>
-                  chan == a
-                }
+              def s(a: Long): Stream[F, A] = publishQueue
+                .toStream(IdPred(chan), chan)
+                //  { case PublishMessage(chan, message) =>
+
+                //   chan == a
+                // }
                 .evalMap { case PublishMessage(chan, PublishRange(from, to)) =>
-                  state.get.map { case (_, _, backlog) =>
+                  state.get.map { case State(_, _, backlog) =>
                     val d = backlog.slice(from, to)
                     Stream.emits(d)
                   }
