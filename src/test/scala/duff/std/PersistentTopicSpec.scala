@@ -27,7 +27,6 @@ class PersistentTopicSpec extends AnyFreeSpec with Matchers {
         _      <- t.publish1(Some(3))*> log(3.toString)
         bStart <- t.subscribe(10).unNoneTerminate.evalTap(k => IO(println(s"second one got $k"))).compile.drain.start
         _      <- t.publish1(None) *> log("none")
-        // bStart <- IO.unit.start
         result <- (aStart.joinWithNever *> bStart.joinWithNever).as(()).race(IO.sleep(3.second)).flatMap {
                     case Left(()) => log("Finished normally") *> IO(Left(()))
                     case Right(_) => log("ERROR") *> t.status.map(Right(_))

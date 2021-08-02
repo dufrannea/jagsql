@@ -125,21 +125,4 @@ class FilteredQueueSpec extends AnyFreeSpec with Matchers {
     }
   }
 
-  "dequeueTakers" in {
-    import FilteredQueue._
-    import PersistentTopic._
-    import cats._
-    import cats.implicits._
-
-    val program = for {
-      deferred <- Deferred[IO, PublishMessage]
-      messages = Queue(PublishMessage(1, PublishRange(0, 4)))
-      takers = Set(Taker[IO, PublishMessage](IdPred(1), deferred))
-      dequeueTakers = FilteredQueue.dequeueTakers0(messages, takers)
-    } yield dequeueTakers
-
-    val (remainingMessages, remainingTakers, matched) = program.unsafeRunSync()
-    assert(remainingMessages.isEmpty, "There should be no message left")
-  }
-
 }

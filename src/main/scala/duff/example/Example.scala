@@ -9,7 +9,6 @@ import duff.jagsql.std.PersistentTopic
 import fs2._
 
 import scala.concurrent.duration._
-import duff.jagsql.std.PersistentTopic.PublishMessage
 
 object Example extends IOApp {
 
@@ -27,14 +26,7 @@ object Example extends IOApp {
       .as(ExitCode.Success)
   }
 
-  def run0(args: List[String]): IO[Either[
-    Unit,
-    (
-      Map[Long, duff.jagsql.std.PersistentTopic.ChannelStatus],
-      scala.collection.immutable.Queue[Option[String]],
-      duff.jagsql.std.FilteredQueue.State[cats.effect.IO, PublishMessage]
-    )
-  ]] = {
+  def run0(args: List[String]): IO[Either[Unit, Unit]] = {
 
     def log(i: String): IO[Unit] = IO(println(i))
 

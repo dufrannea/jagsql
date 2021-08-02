@@ -20,17 +20,17 @@ import eval._
 // - dataflow migration handling
 
 class runnerSpec extends RunnerDsl {
-  val sourceList = (1 to 1).map(_.toString).toList
+  val sourceList = List("lol", "http") 
 
   given lines: Stream[IO, String] =
     Stream.emits(sourceList)
 
-  // "SELECT in.col_0 FROM STDIN" evalsTo (0, Vector(
-  //   Row(List(("col_0", Value.VString("lol")))),
-  //   Row(List(("col_0", Value.VString("http"))))
-  // ))
+  "SELECT in.col_0 FROM STDIN" evalsTo (0, Vector(
+    Row(List(("col_0", Value.VString("lol")))),
+    Row(List(("col_0", Value.VString("http"))))
+  ))
 
-  (1 to 10).foreach { i =>
+  (1 to 1000).foreach { i =>
     "SELECT in.col_0, out.foo AS col_1 FROM STDIN AS in JOIN (SELECT zitch.col_0 AS foo FROM STDIN AS zitch) AS out ON true" evalsTo (i,
     sourceList
       .flatMap(i => sourceList.map(j => i -> j))
@@ -85,7 +85,7 @@ trait RunnerDsl extends AnyFreeSpec with Matchers {
     def evalsTo(i: Int, expected: Vector[Row])(using stdIn: Stream[IO, String]) = {
       import ast._
 
-      s"c.toString$i" in {
+      s"$c-$i" in {
         assert(evaluate(c, stdIn).unsafeRunSync() == expected)//.unsafeRunTimed(10.second).getOrElse(sys.error("should not time out")) == expected)
       }
     }
