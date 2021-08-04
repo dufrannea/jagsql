@@ -97,12 +97,15 @@ object parser {
 
   val literal: Parser[Literal] = regexLiteral | stringLiteral | numberLiteral | boolLiteral
 
+  val identifier = Parser
+    .charIn("abcdefghijklmnopqrstuvwxyz0123456789_".toList)
+    .rep
+
+  val upperCaseIdentifier = Parser
+    .charIn("ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_".toList)
+    .rep
+
   val compositeIdentifier: Parser[String] = {
-
-    val identifier = Parser
-      .charIn("abcdefghijklmnopqrstuvwxyz0123456789_".toList)
-      .rep
-
     (identifier ~ (Parser.char('.') *> identifier).?).map { case (left, maybeRight) =>
       left.toList.mkString + (maybeRight match {
         case None        => ""
@@ -216,14 +219,22 @@ object parser {
 
     val parensSub = Parser.char('(') *> w.? *> recurse <* w.? *> Parser.char(')')
 
+    val tableFunction = ((upperCaseIdentifier <* Parser.char('(') <* w.?) ~
+      (literal <* w.?).repSep0(Parser.char(',') <* w.?) <* Parser.char(')'))
+      .map { case (name, args) =>
+        Source.TableFunction(name.toList.mkString, args.toList)
+      }
+
+    val subQuery = (parensSub ~ (w *> keyword("AS") *> w *> compositeIdentifier <* w.?)).map {
+      case (statement, alias) => Source.SubQuery(statement.asInstanceOf[SelectStatement], alias)
+    }
+
     val selectSource: Parser[Source] =
       // Tableref is for when CTE will be supported, currently there is no way to
       // refer to a subquery in another join clause
       (STDIN *> w.? *> (keyword("AS") *> w *> compositeIdentifier <* w.?).?).map { case (maybeAlias) =>
         Source.StdIn(maybeAlias.getOrElse("in"))
-      } | compositeIdentifier
-        .map(id => Source.TableRef(id)) | (parensSub ~ (w *> keyword("AS") *> w *> compositeIdentifier <* w.?))
-        .map { case (statement, alias) => Source.SubQuery(statement.asInstanceOf[SelectStatement], alias) }
+      } | compositeIdentifier.map(id => Source.TableRef(id)) | subQuery | tableFunction
 
     val joinClause = (JOIN *> w *> (selectSource <* w.?) ~ (ON *> w *> expression <* w.?)).rep(1)
 

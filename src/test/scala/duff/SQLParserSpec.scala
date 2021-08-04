@@ -216,6 +216,23 @@ class SQLParserSpec extends SqlParserTestDsl {
 
     }
 
+    "FUNCTIONS" - {
+      implicit val parser = selectStatement
+
+      "SELECT col_0 FROM SOMEFUNC" fails 
+
+      "SELECT col_0 FROM SOMEFUNC()" parses
+
+      "SELECT col_0 FROM SOMEFUNC(1)" parses
+
+      "SELECT col_0 FROM SOMEFUNC('/foo/bar')" parses
+
+      "SELECT col_0 FROM SOMEFUNC(1, '/foo/bar')" parses
+
+      "SELECT col_0 FROM SOMEFUNC(1, '/foo/bar', /foobar/)" parses
+
+    }
+
     "FROM" - {
       implicit val parser = selectStatement
 

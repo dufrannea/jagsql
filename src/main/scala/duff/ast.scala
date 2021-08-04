@@ -282,6 +282,7 @@ def analyzeStatement(
           state <- Verified.read
           _     <- Verified.set(state + (alias -> s.tableType))
         } yield Source.SubQuery(s, alias)
+      case cst.Source.TableFunction(name, args)  => ???
     }
   }
 

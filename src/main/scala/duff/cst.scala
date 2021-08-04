@@ -67,6 +67,7 @@ enum Source {
   case StdIn(alias: String)
   case TableRef(identifier: String)
   case SubQuery(statement: Statement.SelectStatement, alias: String)
+  case TableFunction(name: String, arguments: List[Literal])
 }
 
 case class FromSource(source: Source, maybeJoinPredicates: Option[Expression])
