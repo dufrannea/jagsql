@@ -20,27 +20,25 @@ import eval._
 // - dataflow migration handling
 
 class runnerSpec extends RunnerDsl {
-  val sourceList = List("lol", "http") 
+  val sourceList = List("lol", "http")
 
   given lines: Stream[IO, String] =
     Stream.emits(sourceList)
 
-  "SELECT in.col_0 FROM STDIN" evalsTo (0, Vector(
+  "SELECT in.col_0 FROM STDIN" evalsTo (1, Vector(
     Row(List(("col_0", Value.VString("lol")))),
     Row(List(("col_0", Value.VString("http"))))
   ))
 
-  (1 to 1000).foreach { i =>
-    "SELECT in.col_0, out.foo AS col_1 FROM STDIN AS in JOIN (SELECT zitch.col_0 AS foo FROM STDIN AS zitch) AS out ON true" evalsTo (i,
-    sourceList
-      .flatMap(i => sourceList.map(j => i -> j))
-      .map { case (i, j) =>
-        val l = List(("col_0", Value.VString(i)), ("col_1", Value.VString(j)))
-        Row(l)
-      }
-      .toVector)
+  "SELECT in.col_0, out.foo AS col_1 FROM STDIN AS in JOIN (SELECT zitch.col_0 AS foo FROM STDIN AS zitch) AS out ON true" evalsTo (1000,
+  sourceList
+    .flatMap(i => sourceList.map(j => i -> j))
+    .map { case (i, j) =>
+      val l = List(("col_0", Value.VString(i)), ("col_1", Value.VString(j)))
+      Row(l)
+    }
+    .toVector)
 
-  }
 }
 
 trait RunnerDsl extends AnyFreeSpec with Matchers {
@@ -82,11 +80,13 @@ trait RunnerDsl extends AnyFreeSpec with Matchers {
       evaluate(c, stdIn).map(v => require(v == expected))
     }
 
-    def evalsTo(i: Int, expected: Vector[Row])(using stdIn: Stream[IO, String]) = {
+    def evalsTo(iterations: Int, expected: Vector[Row])(using stdIn: Stream[IO, String]) = {
       import ast._
 
-      s"$c-$i" in {
-        assert(evaluate(c, stdIn).unsafeRunSync() == expected)//.unsafeRunTimed(10.second).getOrElse(sys.error("should not time out")) == expected)
+      s"$c" in {
+        (0 to iterations).foreach { case i =>
+          assert(evaluate(c, stdIn).unsafeRunSync() == expected, s"iteration $i failed")
+        }
       }
     }
 
