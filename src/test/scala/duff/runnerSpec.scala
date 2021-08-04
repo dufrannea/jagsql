@@ -13,6 +13,8 @@ import org.scalatest.matchers.should.Matchers
 import scala.concurrent.duration._
 
 import eval._
+import java.nio.file.Files
+import java.nio.charset.StandardCharsets
 
 // # personal objectives
 // - articles, blog post
@@ -24,6 +26,11 @@ class runnerSpec extends RunnerDsl {
 
   given lines: Stream[IO, String] =
     Stream.emits(sourceList)
+
+  val createdFilePath = {
+    val file = Files.createTempFile("runnerSpecTest", "foo")
+    Files.write(file, "foo".getBytes(StandardCharsets.UTF_8)).toAbsolutePath.toString
+  }
 
   "SELECT in.col_0 FROM STDIN" evalsTo (1, Vector(
     Row(List(("col_0", Value.VString("lol")))),
@@ -38,6 +45,11 @@ class runnerSpec extends RunnerDsl {
       Row(l)
     }
     .toVector)
+
+  s"SELECT in.col_0 FROM FILE('$createdFilePath') AS in" evalsTo (1, {
+    val l = List(("col_0", Value.VString("foo")))
+    Vector(Row(l))
+  })
 
 }
 
@@ -56,7 +68,7 @@ trait RunnerDsl extends AnyFreeSpec with Matchers {
       parsed   <- parse(query).leftMap(error => s"Error while parsing: $error")
       analyzed <- analyzeStatement(parsed)
                     .runA(Map.empty)
-                    .leftMap(error => new Throwable("Error while analysing $error"))
+                    .leftMap(error => new Throwable(s"Error while analysing $error"))
       rootStage = toStage(analyzed)
       stream = toStream(rootStage, stdIn)
     } yield stream

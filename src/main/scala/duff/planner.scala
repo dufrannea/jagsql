@@ -8,15 +8,18 @@ import ast._
 
 enum Stage {
   case ReadStdIn
+  case ReadFile(file: String)
   case Join(left: Stage, right: Stage, predicate: Option[Expression])
   case Projection(projections: NonEmptyList[ast.Projection], source: Stage)
   case Filter(predicate: Expression, source: Stage)
 }
 
 def toStage(source: ast.Source): Stage = source match {
-  case Source.StdIn(_)               => Stage.ReadStdIn
-  case Source.SubQuery(statement, _) => toStage(statement)
-  case Source.TableRef(_, _)         => sys.error("TableRef not supported")
+  case Source.StdIn(_)                              => Stage.ReadStdIn
+  case Source.SubQuery(statement, _)                => toStage(statement)
+  case Source.TableRef(_, _)                        => sys.error("TableRef not supported")
+  case Source.TableFunction("FILE", path :: Nil, _) => Stage.ReadFile(path.asInstanceOf[cst.Literal.StringLiteral].a)
+  case _                                            => sys.error("Stage not implemented")
 }
 
 def toStage(fromClause: ast.FromClause): Stage =
