@@ -180,7 +180,7 @@ class SQLParserSpec extends SqlParserTestDsl {
         Some(
           FromClause(
             NonEmptyList.one(
-              FromSource(TableRef("foo"), None)
+              FromSource(TableRef("foo", "foo"), None)
             )
           )
         )
@@ -191,9 +191,9 @@ class SQLParserSpec extends SqlParserTestDsl {
         Some(
           FromClause(
             NonEmptyList(
-              FromSource(TableRef("foo"), None),
+              FromSource(TableRef("foo", "foo"), None),
               List(
-                FromSource(TableRef("bar"), Some(one))
+                FromSource(TableRef("bar", "bar"), Some(one))
               )
             )
           )
@@ -214,35 +214,37 @@ class SQLParserSpec extends SqlParserTestDsl {
 
       "SELECT col_0 FROM STDIN" parses
 
+      "SELECT col_0 FROM STDIN AS foo" parses
+
     }
 
     "FUNCTIONS" - {
       implicit val parser = selectStatement
 
-      "SELECT col_0 FROM SOMEFUNC" fails 
+      "SELECT col_0 FROM SOMEFUNC" fails
 
-      "SELECT col_0 FROM SOMEFUNC()" parses
+      "SELECT col_0 FROM SOMEFUNC() AS foo" parses
 
-      "SELECT col_0 FROM SOMEFUNC(1)" parses
+      "SELECT col_0 FROM SOMEFUNC(1) AS foo" parses
 
-      "SELECT col_0 FROM SOMEFUNC('/foo/bar')" parses
+      "SELECT col_0 FROM SOMEFUNC('/foo/bar') AS foo" parses
 
-      "SELECT col_0 FROM SOMEFUNC(1, '/foo/bar')" parses
+      "SELECT col_0 FROM SOMEFUNC(1, '/foo/bar') AS foo" parses
 
-      "SELECT col_0 FROM SOMEFUNC(1, '/foo/bar', /foobar/)" parses
+      "SELECT col_0 FROM SOMEFUNC(1, '/foo/bar', /foobar/) AS foo" parses
 
     }
 
     "FROM" - {
       implicit val parser = selectStatement
 
-      "SELECT 1 FROM didier" parsesTo
+      "SELECT 1 FROM foo" parsesTo
         SelectStatement(
           NonEmptyList.one(Projection(one)),
           Some(
             FromClause(
               NonEmptyList.one(
-                FromSource(TableRef("didier"), None)
+                FromSource(TableRef("foo", "foo"), None)
               )
             )
           )
@@ -298,6 +300,15 @@ class SQLParserSpec extends SqlParserTestDsl {
       "SELECT foo.bar" parses
 
     }
+
+  }
+
+  "maybeAliased should be able to backtrack" - {
+    implicit val parser = maybeAliased(Parser.char('a')) ~ (Parser.char(' ') *> Parser.char('b'))
+
+    "a b" parsesTo (((), None), ())
+
+    "a AS foo b" parses
 
   }
 
