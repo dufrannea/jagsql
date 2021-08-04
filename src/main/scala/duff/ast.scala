@@ -88,6 +88,8 @@ object Source {
     def tableType = statement.tableType
   }
 
+  case class TableFunction(name: String, args: List[cst.Literal], tableType: ComplexType.Table) extends Source
+
 }
 
 /** Statements
@@ -132,18 +134,21 @@ object Verified {
   def error(s: String): Verified[Nothing] = s.asLeft.liftTo[Verified]
 }
 
+def getLiteralType(l: cst.Literal) =
+  l match {
+    // TODO: actually depending on the regex literal we can either
+    // return an array or a string, that is the goal of it :)
+    case cst.Literal.RegexLiteral(_)  => Type.String
+    case cst.Literal.StringLiteral(_) => Type.String
+    case cst.Literal.NumberLiteral(_) => Type.Number
+    case cst.Literal.BoolLiteral(_)   => Type.Bool
+  }
+
 def analyzeExpression(
   e: cst.Expression
 ): Verified[Fix[ExpressionF]] = e match {
   case cst.Expression.LiteralExpression(l)                    =>
-    val expressionType = l match {
-      // TODO: actually depending on the regex literal we can either
-      // return an array or a string, that is the goal of it :)
-      case cst.Literal.RegexLiteral(_)  => Type.String
-      case cst.Literal.StringLiteral(_) => Type.String
-      case cst.Literal.NumberLiteral(_) => Type.Number
-      case cst.Literal.BoolLiteral(_)   => Type.Bool
-    }
+    val expressionType = getLiteralType(l)
 
     StateT.pure(Fix(ExpressionF.LiteralExpression(l, expressionType)))
   case cst.Expression.FunctionCallExpression(name, arguments) =>
@@ -262,13 +267,13 @@ def analyzeStatement(
     f match {
       // TODO: there should be no special case here
       // for STDIN, it should be no different from a subquery or a table ref
-      case cst.Source.StdIn(alias)                     =>
+      case cst.Source.StdIn(alias)                   =>
         for {
           state  <- Verified.read
           source <- Source.StdIn(alias).asRight.liftTo[Verified]
           _      <- Verified.set(state + (alias -> source.tableType))
         } yield source
-      case cst.Source.TableRef(id, alias)              =>
+      case cst.Source.TableRef(id, alias)            =>
         for {
           ref    <- Verified.read
           source <- (ref.get(id) match {
@@ -277,14 +282,30 @@ def analyzeStatement(
                     }).liftTo[Verified]
           _      <- Verified.set(ref + (alias -> source.tableType))
         } yield source
-      case cst.Source.SubQuery(statement, alias)       =>
+      case cst.Source.SubQuery(statement, alias)     =>
         for {
           s     <- analyzeStatement(statement)
           state <- Verified.read
           _     <- Verified.set(state + (alias -> s.tableType))
         } yield Source.SubQuery(s, alias)
-      case cst.Source.TableFunction(name, args, alias) => ???
+      case s @ cst.Source.TableFunction(_, _, alias) =>
+        for {
+          state    <- Verified.read
+          function <- validateFunction(s)
+          _        <- Verified.set(state + (alias -> function.tableType))
+        } yield function
     }
+  }
+
+  def validateFunction(source: cst.Source.TableFunction): Verified[Source] = {
+    val fileFunType: ComplexType.Table = ComplexType.Table(NonEmptyMap.of("col_0" -> SimpleType.String))
+
+    source match {
+      case cst.Source.TableFunction("FILE", args, alias) if args.map(getLiteralType) == List(Type.String) =>
+        Source.TableFunction("FILE", args, fileFunType).asRight.liftTo[Verified]
+      case _ => s"Unknown table function ${source.name} with supplied arguments".asLeft.liftTo[Verified]
+    }
+
   }
 
   def analyzeFromSource(fromItem: cst.FromSource): Verified[ast.FromSource] = {
