@@ -16,6 +16,7 @@ import scala.util.matching.Regex
 import cst._
 import Expression._
 import Statement._
+import scala.annotation.internal.Alias
 
 object parser {
   case class Position(from: Int, to: Int)
@@ -214,27 +215,33 @@ object parser {
 
   val whereClause = (WHERE *> w *> expression).map(e => WhereClause(e))
 
-  // TODO: can we support only where without FROM ?
+  def maybeAliased[T](parser: Parser[T]): Parser[(T, Option[String])] =
+    parser ~ (w *> keyword("AS") *> w *> compositeIdentifier).backtrack.?
+
+  def aliased[T](parser: Parser[T]): Parser[(T, String)] =
+    parser ~ (w *> keyword("AS") *> w *> compositeIdentifier)
+
+  // TODO: can we support only where without FROM
   val selectStatement: Parser[SelectStatement] = Parser.recursive { recurse =>
 
     val parensSub = Parser.char('(') *> w.? *> recurse <* w.? *> Parser.char(')')
 
-    val tableFunction = ((upperCaseIdentifier <* Parser.char('(') <* w.?) ~
-      (literal <* w.?).repSep0(Parser.char(',') <* w.?) <* Parser.char(')'))
-      .map { case (name, args) =>
-        Source.TableFunction(name.toList.mkString, args.toList)
-      }
+    val tableFunction = (upperCaseIdentifier <* Parser.char('(') <* w.?) ~
+      (literal <* w.?).repSep0(Parser.char(',') <* w.?) <* Parser.char(')')
 
-    val subQuery = (parensSub ~ (w *> keyword("AS") *> w *> compositeIdentifier <* w.?)).map {
-      case (statement, alias) => Source.SubQuery(statement.asInstanceOf[SelectStatement], alias)
-    }
+    val subQuery = parensSub
 
     val selectSource: Parser[Source] =
       // Tableref is for when CTE will be supported, currently there is no way to
       // refer to a subquery in another join clause
-      (STDIN *> w.? *> (keyword("AS") *> w *> compositeIdentifier <* w.?).?).map { case (maybeAlias) =>
-        Source.StdIn(maybeAlias.getOrElse("in"))
-      } | compositeIdentifier.map(id => Source.TableRef(id)) | subQuery | tableFunction
+      maybeAliased(STDIN).map { case (stdin, alias) => Source.StdIn(alias.getOrElse("in")) }
+        | maybeAliased(compositeIdentifier).map { case (tableRef, alias) =>
+          Source.TableRef(tableRef, alias.getOrElse(tableRef))
+        }
+        | aliased(subQuery).map { case (statement, alias) => Source.SubQuery(statement, alias) }
+        | aliased(tableFunction).map { case ((name, args), alias) =>
+          Source.TableFunction(name.toList.mkString, args.toList, alias)
+        }
 
     val joinClause = (JOIN *> w *> (selectSource <* w.?) ~ (ON *> w *> expression <* w.?)).rep(1)
 

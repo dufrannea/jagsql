@@ -63,11 +63,13 @@ enum Expression {
   case IdentifierExpression(identifier: String)
 }
 
+case class Aliased[T](source: T, alias: Option[String])
+
 enum Source {
   case StdIn(alias: String)
-  case TableRef(identifier: String)
+  case TableRef(identifier: String, alias: String)
   case SubQuery(statement: Statement.SelectStatement, alias: String)
-  case TableFunction(name: String, arguments: List[Literal])
+  case TableFunction(name: String, arguments: List[Literal], alias: String)
 }
 
 case class FromSource(source: Source, maybeJoinPredicates: Option[Expression])

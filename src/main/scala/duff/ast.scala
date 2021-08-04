@@ -262,27 +262,28 @@ def analyzeStatement(
     f match {
       // TODO: there should be no special case here
       // for STDIN, it should be no different from a subquery or a table ref
-      case cst.Source.StdIn(alias)               =>
+      case cst.Source.StdIn(alias)                     =>
         for {
           state  <- Verified.read
           source <- Source.StdIn(alias).asRight.liftTo[Verified]
           _      <- Verified.set(state + (alias -> source.tableType))
         } yield source
-      case cst.Source.TableRef(id)               =>
+      case cst.Source.TableRef(id, alias)              =>
         for {
           ref    <- Verified.read
           source <- (ref.get(id) match {
                       case Some(tableType) => Source.TableRef(id, tableType).asRight
                       case None            => s"table not found $id".asLeft
                     }).liftTo[Verified]
+          _      <- Verified.set(ref + (alias -> source.tableType))
         } yield source
-      case cst.Source.SubQuery(statement, alias) =>
+      case cst.Source.SubQuery(statement, alias)       =>
         for {
           s     <- analyzeStatement(statement)
           state <- Verified.read
           _     <- Verified.set(state + (alias -> s.tableType))
         } yield Source.SubQuery(s, alias)
-      case cst.Source.TableFunction(name, args)  => ???
+      case cst.Source.TableFunction(name, args, alias) => ???
     }
   }
 
