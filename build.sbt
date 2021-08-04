@@ -29,5 +29,6 @@ lazy val root = project
       "-language:higherKinds", // Allow higher-kinded types
       "-unchecked", // Enable additional warnings where generated code depends on assumptions.
       "-Xfatal-warnings" // Fail the compilation if there are any warnings.
-    )
+    ),
+    assembly / mainClass := Some("duff.jagsql.Main")
   )
