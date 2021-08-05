@@ -116,6 +116,17 @@ object parser {
 
   }
 
+  val orAnd = List(
+    (
+      "||",
+      BinaryOperator.Or
+    ),
+    (
+      "&&",
+      BinaryOperator.And
+    )
+  )
+
   val ops = List(
     ("=", BinaryOperator.Equal),
     ("!=", BinaryOperator.Different),
@@ -134,14 +145,6 @@ object parser {
     (
       "<",
       BinaryOperator.Less
-    ),
-    (
-      "||",
-      BinaryOperator.Or
-    ),
-    (
-      "&&",
-      BinaryOperator.And
     )
   )
 
@@ -166,6 +169,10 @@ object parser {
       BinaryOperator.Minus
     )
   )
+
+  val prioBinaryOperator = Parser.oneOf(orAnd.map { case (s, op) =>
+    Parser.string(s).map(_ => op)
+  })
 
   val binaryOperator = Parser.oneOf(ops.map { case (s, op) =>
     Parser.string(s).map(_ => op)
@@ -203,7 +210,8 @@ object parser {
     )
 
     val lowPriority = binaryExpression(binaryOperator)(term)
-    val times = binaryExpression(timesDividedOperator)(lowPriority)
+    val prioBinary = binaryExpression(prioBinaryOperator)(lowPriority)
+    val times = binaryExpression(timesDividedOperator)(prioBinary)
     val plus = binaryExpression(plusMinusOperator)(times)
     plus
   }

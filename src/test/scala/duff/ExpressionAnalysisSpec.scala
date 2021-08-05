@@ -101,6 +101,8 @@ class ExpressionAnalysisSpec extends AnalysisDsl:
 
     "true || false" hasType Type.Bool
 
+    "1 = 1 || 2 = 2" hasType Type.Bool
+
   }
 
 trait AnalysisDsl extends AnyFreeSpec with Matchers:
