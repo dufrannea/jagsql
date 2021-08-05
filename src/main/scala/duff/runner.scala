@@ -51,6 +51,7 @@ def toStream(s: Stage, stdInLines: Stream[IO, String] = defaultStdInLines): fs2.
         readInputStream[IO](IO(new FileInputStream(file)), 1024)
           .through(fs2.text.utf8Decode)
           .through(fs2.text.lines)
+          .dropLastIf(_.isEmpty)
           .map(line => Row(List(("col_0", Value.VString(line)))))
       case Stage.Projection(projections, source)               =>
         val sourceStream = toStream0(source, topic)
