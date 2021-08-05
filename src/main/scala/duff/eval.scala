@@ -33,8 +33,8 @@ def alg(e: ExpressionF[ExpressionValue]): ExpressionValue = e match {
     Kleisli(_ => value)
   case ExpressionF.Binary(left, right, operator, commonType) =>
     val v = ((left, right)).tupled.map { case (l, r) => (l, r, operator) }.map {
-      case (_, _, Operator.Equal)                       => VBoolean(left == right)
-      case (_, _, Operator.Different)                   => VBoolean(left != right)
+      case (left, right, Operator.Equal)                => VBoolean(left == right)
+      case (left, right, Operator.Different)            => VBoolean(left != right)
       case (VNumber(i), VNumber(j), Operator.Less)      => VBoolean(i < j)
       case (VNumber(i), VNumber(j), Operator.More)      => VBoolean(i > j)
       case (VNumber(i), VNumber(j), Operator.LessEqual) => VBoolean(i <= j)

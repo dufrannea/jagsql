@@ -26,6 +26,8 @@ class evalSpec extends EvalDsl:
 
   "2 * 1 + 1" evaluatesTo Value.VNumber(BigDecimal(3)) 
 
+  "'lol' = 'lol'" evaluatesTo Value.VBoolean(true) 
+
 trait EvalDsl extends AnyFreeSpec with Matchers:
 
   private def analyze(e: cst.Expression): Either[String, ast.Expression] = analyzeExpression(e).runA(Map.empty)
