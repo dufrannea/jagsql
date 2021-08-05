@@ -75,7 +75,7 @@ def toStream(s: Stage, stdInLines: Stream[IO, String] = defaultStdInLines): fs2.
       case Stage.Filter(predicate, source)                     =>
         val sourceStream = toStream0(source)
 
-        sourceStream.map(_.filter { case Row(inputColValues) =>
+        Functor[MaybeNeedsTopic].map(sourceStream)(_.filter { case Row(inputColValues) =>
           val lookup = inputColValues.toMap
           unsafeEvalBool(predicate)(lookup)
         })

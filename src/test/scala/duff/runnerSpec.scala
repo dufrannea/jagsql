@@ -51,6 +51,9 @@ class runnerSpec extends RunnerDsl {
     Vector(Row(l))
   })
 
+  "SELECT in.col_0 FROM STDIN AS in WHERE in.col_0 = 'lol'" evalsTo (1, Vector(
+    Row(List(("col_0", Value.VString("lol")))),
+  ))
 }
 
 trait RunnerDsl extends AnyFreeSpec with Matchers {
