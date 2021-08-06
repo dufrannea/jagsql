@@ -46,6 +46,26 @@ class StatementAnalysisSpec extends StatementAnalysisDsl:
 
   "SELECT foo.bazzzz FROM (SELECT 1 AS bar) AS foo" fails
 
+  "SELECT foo.col_0 FROM STDIN AS foo GROUP BY foo.col_0" succeeds
+
+  // group by non existing column fails
+  "SELECT 1 FROM (SELECT 1 AS foo, 2 AS bar) AS foo GROUP BY foo.non_existing_col" fails
+
+  "SELECT foo.bar FROM (SELECT 1 AS bar, 2 AS baz) AS foo GROUP BY foo.bar" succeeds
+
+  "Cannot select a field if not in group or not in an aggregate function" - {
+    "SELECT foo.bar, foo.baz FROM (SELECT 1 AS bar, 2 AS baz) AS foo GROUP BY foo.bar" fails
+
+    "SELECT foo.bar, max(foo.baz) FROM (SELECT 1 AS bar, 2 AS baz) AS foo GROUP BY foo.bar" succeeds
+
+    "SELECT max(foo.baz) FROM (SELECT 1 AS bar, 2 AS baz) AS foo GROUP BY foo.bar" succeeds
+
+    "SELECT foo.bar + 1 FROM (SELECT 1 AS bar, 2 AS baz) AS foo GROUP BY foo.bar + 1" succeeds 
+
+    "SELECT 1 FROM (SELECT 1 AS bar, 2 AS baz) AS foo GROUP BY foo.bar" succeeds 
+
+  }
+
 trait StatementAnalysisDsl extends AnyFreeSpec with Matchers:
 
   def analyze(e: cst.Statement.SelectStatement): Either[String, ast.Statement.SelectStatement] =
@@ -107,4 +127,5 @@ trait StatementAnalysisDsl extends AnyFreeSpec with Matchers:
           case Right(result) => fail("expected error")
         }
       }
+
   }

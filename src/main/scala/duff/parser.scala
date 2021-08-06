@@ -269,11 +269,13 @@ object parser {
           first
         }
 
-    val groupBy = keyword("GROUP BY") *> w *> (expression <* w.?).repSep(1, Parser.char(',') <* w.?)
+    val groupBy = (keyword("GROUP BY") *> w *> (expression <* w.?).repSep(1, Parser.char(',') <* w.?)).map {
+      case expressions => GroupByClause(expressions)
+    }
 
-    (selectWithProjections ~ (fromClause.?) ~ whereClause.?)
-      .map { case ((expressions, maybeFromClause), maybeWhereClause) =>
-        SelectStatement(expressions, maybeFromClause, maybeWhereClause)
+    (selectWithProjections ~ (fromClause.?) ~ whereClause.? ~ groupBy.?)
+      .map { case (((expressions, maybeFromClause), maybeWhereClause), maybeGroupByClause) =>
+        SelectStatement(expressions, maybeFromClause, maybeWhereClause, maybeGroupByClause)
       }
 
   }

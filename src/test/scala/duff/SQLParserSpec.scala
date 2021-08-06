@@ -14,6 +14,7 @@ import cst.Literal._
 import cst.Statement._
 import cst.Source._
 import parser._
+import cats.syntax.group
 
 class SQLParserSpec extends SqlParserTestDsl {
 
@@ -286,6 +287,16 @@ class SQLParserSpec extends SqlParserTestDsl {
       "SELECT 1 FROM didier WHERE 1" parses
 
       "SELECT 1 FROM didier JOIN tata ON 1 WHERE 2" parses
+    }
+
+    "GROUP BY" - {
+      implicit val parser = selectStatement 
+
+      "SELECT 1 FROM foo GROUP BY" fails 
+
+      "SELECT 1 FROM foo GROUP BY 1" parses 
+
+      "SELECT 1 AS bar FROM foo GROUP BY bar" parses 
     }
 
     "Identifiers" - {

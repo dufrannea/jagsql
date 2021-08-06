@@ -41,6 +41,7 @@ import Type._
 
 enum Function(val args: List[Type], val returnType: Type) {
   case file extends Function(Type.String :: Nil, Type.String)
+  case max extends Function(Type.Number :: Nil, Type.Number)
 }
 
 enum ExpressionF[K] {
@@ -324,18 +325,48 @@ def analyzeStatement(
           .traverse(analyzeFromSource)
     } yield FromClause(analyzedItems)
 
+  def isAggregateFunction(e: ast.Expression): Boolean = {
+    e.unfix match {
+      case fce: ast.ExpressionF.FunctionCallExpression[_] => true
+      case _                                              => false
+    }
+  }
+
   s match {
     case cst.Statement.SelectStatement(projections, from, maybeWhere, maybeGroupBy) =>
       for {
         // TODO: if FROM expansion appears at analysis, there is duplicate code
         // happening here
-        analyzedFrom        <- from match {
-                                 case None    => sys.error("should not happen, from clause has already been substituted")
-                                 case Some(f) => analyzeFromClause(f)
-                               }
-        analyzedProjections <- projections.traverse { case cst.Projection(expression, alias) =>
-                                 analyzeExpression(expression).map(e => Projection(e, alias))
-                               }
+        analyzedFrom         <- from match {
+                                  case None    => sys.error("should not happen, from clause has already been substituted")
+                                  case Some(f) => analyzeFromClause(f)
+                                }
+        maybeAnalyzedGroupBy <-
+          maybeGroupBy
+            .traverse { case groupBy =>
+              groupBy.expressions.traverse(analyzeExpression).map(GroupByClause.apply)
+            }
+        analyzedProjections  <- projections.traverse { case cst.Projection(expression, alias) =>
+                                  analyzeExpression(expression).map(e => Projection(e, alias))
+                                }
+        _                    <- maybeAnalyzedGroupBy
+                                  .flatMap { g =>
+                                    val allowedExpressions = g.expressions.toList.toSet
+
+                                    val errors = analyzedProjections.collect {
+                                      case projection
+                                          if !allowedExpressions.contains(projection.e) && !isAggregateFunction(
+                                            projection.e
+                                          ) && !projection.e.unfix.isInstanceOf[ExpressionF.LiteralExpression[_]] =>
+                                        s"$projection should be part of GROUP BY expressions, a literal or an aggregate function"
+                                    }
+                                    if (errors.isEmpty)
+                                      None
+                                    else
+                                      Some(errors.mkString(","))
+                                  }
+                                  .toLeft(())
+                                  .liftTo[Verified]
         analyzedWhere <- maybeWhere.traverse(where => analyzeExpression(where.expression).map(k => WhereClause(k)))
         maybeAnalyzedGroupBy <-
           maybeGroupBy
