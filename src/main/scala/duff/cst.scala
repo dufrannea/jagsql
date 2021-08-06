@@ -74,15 +74,16 @@ enum Source {
 
 case class FromSource(source: Source, maybeJoinPredicates: Option[Expression])
 case class FromClause(items: NonEmptyList[FromSource])
-
 case class WhereClause(expression: Expression)
+case class GroupByClause(expressions: NonEmptyList[Expression])
 
 enum Statement {
 
   case SelectStatement(
     projections: NonEmptyList[Projection],
     fromClause: Option[FromClause] = None,
-    whereClause: Option[WhereClause] = None
+    whereClause: Option[WhereClause] = None,
+    groupByClause: Option[GroupByClause] = None
   )
 
 }

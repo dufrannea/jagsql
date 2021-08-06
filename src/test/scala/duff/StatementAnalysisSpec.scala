@@ -23,6 +23,7 @@ class StatementAnalysisSpec extends StatementAnalysisDsl:
       NonEmptyList.one(Projection(one, None)),
       FromClause(NonEmptyList.of(FromSource(Source.StdIn("in"), None))),
       None,
+      None,
       ss
     )
   }
@@ -31,6 +32,7 @@ class StatementAnalysisSpec extends StatementAnalysisDsl:
     Statement.SelectStatement(
       NonEmptyList.one(Projection(one, None)),
       FromClause(NonEmptyList.of(FromSource(Source.StdIn("in"), None))),
+      None,
       None,
       ss
     )

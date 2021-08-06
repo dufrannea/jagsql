@@ -104,6 +104,7 @@ def toStream(s: Stage, stdInLines: Stream[IO, String] = defaultStdInLines): fs2.
               filtered
           }
         }
+      case Stage.GroupBy(_, _) => sys.error("not implemented yet")
     }
 
   toStream0(s) match {

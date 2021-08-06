@@ -274,6 +274,8 @@ object parser {
           first
         }
 
+    val groupBy = keyword("GROUP BY") *> w *> (expression <* w.?).repSep(1, Parser.char(',') <* w.?)
+
     (selectWithProjections ~ (fromClause.?) ~ whereClause.?)
       .map { case ((expressions, maybeFromClause), maybeWhereClause) =>
         SelectStatement(expressions, maybeFromClause, maybeWhereClause)

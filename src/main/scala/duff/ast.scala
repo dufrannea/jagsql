@@ -100,6 +100,7 @@ case class FromSource(source: Source, joinPredicates: Option[Expression]) {
 
 case class FromClause(items: NonEmptyList[FromSource])
 case class WhereClause(expression: Expression)
+case class GroupByClause(expressions: NonEmptyList[Expression])
 
 case class Projection(e: Expression, maybeAlias: Option[String])
 
@@ -110,6 +111,7 @@ enum Statement {
     projections: NonEmptyList[Projection],
     fromClause: FromClause,
     whereClause: Option[WhereClause] = None,
+    groupByClause: Option[GroupByClause] = None,
     tableType: ComplexType.Table
   )
 
@@ -245,15 +247,16 @@ def analyzeExpression(
 // if a from clause is not present, consider we are selecting from STDIN
 def addEmptyStdin(s: cst.Statement.SelectStatement): cst.Statement.SelectStatement = {
   s match {
-    case cst.Statement.SelectStatement(projections, None, maybeWhere) =>
+    case cst.Statement.SelectStatement(projections, None, maybeWhere, maybeGroupBy) =>
       cst
         .Statement
         .SelectStatement(
           projections,
           Some(cst.FromClause(NonEmptyList.one(cst.FromSource(cst.Source.StdIn("in"), None)))),
-          maybeWhere
+          maybeWhere,
+          maybeGroupBy
         )
-    case _                                                            => s
+    case _                                                                          => s
   }
 }
 
@@ -326,7 +329,7 @@ def analyzeStatement(
   }
 
   s match {
-    case cst.Statement.SelectStatement(projections, from, maybeWhere) =>
+    case cst.Statement.SelectStatement(projections, from, maybeWhere, maybeGroupBy) =>
       for {
         // TODO: if FROM expansion appears at analysis, there is duplicate code
         // happening here
@@ -338,6 +341,11 @@ def analyzeStatement(
                                  analyzeExpression(expression).map(e => Projection(e, alias))
                                }
         analyzedWhere <- maybeWhere.traverse(where => analyzeExpression(where.expression).map(k => WhereClause(k)))
+        maybeAnalyzedGroupBy <-
+          maybeGroupBy
+            .traverse { case groupBy =>
+              groupBy.expressions.traverse(analyzeExpression).map(GroupByClause.apply)
+            }
         types = analyzedProjections
                   .zipWithIndex
                   .map { case (Projection(e, maybeAlias), index) =>
@@ -355,6 +363,7 @@ def analyzeStatement(
         analyzedProjections,
         analyzedFrom,
         analyzedWhere,
+        None,
         ComplexType.Table(types)
       )
   }

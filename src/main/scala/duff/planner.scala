@@ -12,6 +12,7 @@ enum Stage {
   case Join(left: Stage, right: Stage, predicate: Option[Expression])
   case Projection(projections: NonEmptyList[ast.Projection], source: Stage)
   case Filter(predicate: Expression, source: Stage)
+  case GroupBy(expressions: NonEmptyList[Expression], source: Stage)
 }
 
 def toStage(source: ast.Source): Stage = source match {
@@ -37,11 +38,16 @@ def toStage(fromClause: ast.FromClause): Stage =
 
 def toStage(statement: Statement.SelectStatement): Stage = {
   statement match {
-    case Statement.SelectStatement(projections, fromClause, whereClause, _) =>
+    case Statement.SelectStatement(projections, fromClause, whereClause, groupByClause, _) =>
       val projectionStage = Stage.Projection(projections, toStage(fromClause))
-      whereClause match {
+      val filterStage = whereClause match {
         case None                              => projectionStage
         case Some(ast.WhereClause(expression)) => Stage.Filter(expression, projectionStage)
+      }
+
+      groupByClause match {
+        case None                                 => filterStage
+        case Some(ast.GroupByClause(expressions)) => Stage.GroupBy(expressions, filterStage)
       }
   }
 
