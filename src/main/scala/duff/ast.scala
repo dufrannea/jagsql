@@ -22,6 +22,7 @@ enum SimpleType {
 
 enum ComplexType {
   case Table(cols: NonEmptyMap[String, SimpleType])
+  case Array(typeParameter: Type)
 }
 
 enum Type {
@@ -39,9 +40,10 @@ object Type {
 
 import Type._
 
-enum Function(val args: List[Type], val returnType: Type) {
+enum Function(val args: List[Type], val returnType: Type, val maybeVariadic: Option[Type] = None) {
   case file extends Function(Type.String :: Nil, Type.String)
-  case max extends Function(Type.Number :: Nil, Type.Number)
+  case max extends Function(Type.Number :: Nil, Type.Complex(ComplexType.Array(Type.Number)))
+  case array extends Function(Nil, Type.Number, Some(Type.Number))
 }
 
 enum ExpressionF[K] {
@@ -52,7 +54,7 @@ enum ExpressionF[K] {
   case FunctionCallExpression(name: String, arguments: Seq[K], expressionType: Type)
   case Binary(left: K, right: K, operator: cst.Operator, expressionType: Type)
   case Unary(expression: K, expressionType: Type)
-  case FieldRef(value: String, expressionType: Type)
+  case FieldRef(tableId: String, fieldId: String, expressionType: Type)
 }
 
 object ExpressionF {
@@ -64,7 +66,7 @@ object ExpressionF {
       case Binary(left, right, operator, t)      => Binary(f(left), f(right), operator, t)
       case Unary(e, t)                           => Unary(f(e), t)
       case LiteralExpression(literal, t)         => LiteralExpression(literal, t)
-      case FieldRef(value, t)                    => FieldRef(value, t)
+      case FieldRef(tableId, fieldId, t)         => FieldRef(tableId, fieldId, t)
     }
 
 }
@@ -155,11 +157,19 @@ def analyzeExpression(
 
     StateT.pure(Fix(ExpressionF.LiteralExpression(l, expressionType)))
   case cst.Expression.FunctionCallExpression(name, arguments) =>
+    // TODO: overload resolution
     val function = Function.valueOf(name)
 
     for {
       analyzedArguments <- arguments.traverse(analyzeExpression(_))
-      zippedArgsWithExpectedTypes = function.args.zip(analyzedArguments)
+      argsStream = function.args.to(LazyList) ++: function
+                     .maybeVariadic
+                     .map(t => LazyList.continually(t))
+                     .getOrElse(LazyList.empty[Type])
+      zippedArgsWithExpectedTypes =
+        argsStream
+          .zip(analyzedArguments)
+          .toList
       _                 <-
         zippedArgsWithExpectedTypes
           .foldM(()) { case (_, (expectedArgType, Fix(analyzedExpression))) =>
@@ -228,7 +238,7 @@ def analyzeExpression(
                       tableType.cols(fieldId) match {
                         case None            => s"Non existing field $fieldId on table $tableId".asLeft.liftTo[Verified]
                         case Some(fieldType) =>
-                          Fix(ExpressionF.FieldRef(fieldId, Type.Simple(fieldType))).asRight.liftTo[Verified]
+                          Fix(ExpressionF.FieldRef(tableId, fieldId, Type.Simple(fieldType))).asRight.liftTo[Verified]
                       }
                     }
                   case _                         =>

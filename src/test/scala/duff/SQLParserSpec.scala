@@ -63,6 +63,15 @@ class SQLParserSpec extends SqlParserTestDsl {
 
     "file(1)" parses
 
+    "array(1,2,3)" parsesTo (FunctionCallExpression(
+      "array",
+      Seq(1, 2, 3).map(i => LiteralExpression(NumberLiteral(i)))
+    ): Expression)
+
+    "array(1, 2, 3)" parses
+
+    "array( 1 , 2,3 )" parses
+
     "Operator precedence" - {
 
       "1 + 1 * 2" parses
@@ -290,13 +299,13 @@ class SQLParserSpec extends SqlParserTestDsl {
     }
 
     "GROUP BY" - {
-      implicit val parser = selectStatement 
+      implicit val parser = selectStatement
 
-      "SELECT 1 FROM foo GROUP BY" fails 
+      "SELECT 1 FROM foo GROUP BY" fails
 
-      "SELECT 1 FROM foo GROUP BY 1" parses 
+      "SELECT 1 FROM foo GROUP BY 1" parses
 
-      "SELECT 1 AS bar FROM foo GROUP BY bar" parses 
+      "SELECT 1 AS bar FROM foo GROUP BY bar" parses
     }
 
     "Identifiers" - {

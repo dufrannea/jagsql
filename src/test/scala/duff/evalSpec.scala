@@ -16,17 +16,19 @@ import cst.Literal
 import parser.expression
 
 class evalSpec extends EvalDsl:
-  "1" evaluatesTo Value.VNumber(BigDecimal(1)) 
+  "1" evaluatesTo Value.VNumber(BigDecimal(1))
 
-  "'1'" evaluatesTo Value.VString("1") 
+  "'1'" evaluatesTo Value.VString("1")
 
-  "1 + 1" evaluatesTo Value.VNumber(BigDecimal(2)) 
+  "1 + 1" evaluatesTo Value.VNumber(BigDecimal(2))
 
-  "1 + 1 * 2" evaluatesTo Value.VNumber(BigDecimal(3)) 
+  "1 + 1 * 2" evaluatesTo Value.VNumber(BigDecimal(3))
 
-  "2 * 1 + 1" evaluatesTo Value.VNumber(BigDecimal(3)) 
+  "2 * 1 + 1" evaluatesTo Value.VNumber(BigDecimal(3))
 
-  "'lol' = 'lol'" evaluatesTo Value.VBoolean(true) 
+  "'lol' = 'lol'" evaluatesTo Value.VBoolean(true)
+
+  "array(1,2,3)" evaluatesTo Value.VArray(List(Value.VNumber(1), Value.VNumber(2), Value.VNumber(3)))
 
 trait EvalDsl extends AnyFreeSpec with Matchers:
 
@@ -37,8 +39,8 @@ trait EvalDsl extends AnyFreeSpec with Matchers:
 
   def evaluate(c: String): Either[String, Value] = {
     for {
-        analyzed <- analyze(c)
-        evaluated <- eval(analyzed).asRight
+      analyzed  <- analyze(c)
+      evaluated <- eval(analyzed).asRight
     } yield evaluated(Map.empty)
   }
 
@@ -58,7 +60,7 @@ trait EvalDsl extends AnyFreeSpec with Matchers:
     def succeeds: Unit =
       c.toString in {
         evaluate(c) match {
-          case Left(e)       => fail(e)
+          case Left(e)  => fail(e)
           case Right(_) => succeed
         }
       }
@@ -66,8 +68,9 @@ trait EvalDsl extends AnyFreeSpec with Matchers:
     def fails: Unit =
       c.toString in {
         evaluate(c) match {
-          case Left(_)       => succeed
+          case Left(_)  => succeed
           case Right(_) => fail("expected error")
         }
       }
+
   }

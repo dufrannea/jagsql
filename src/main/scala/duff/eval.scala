@@ -14,6 +14,7 @@ enum Value {
   case VString(e: String)
   case VNumber(e: BigDecimal)
   case VBoolean(e: Boolean)
+  case VArray(values: List[Value])
   case Error
 }
 
@@ -23,7 +24,7 @@ import cst.Operator
 type ExpressionValue = Reader[Map[String, Value], Value]
 
 def alg(e: ExpressionF[ExpressionValue]): ExpressionValue = e match {
-  case ExpressionF.LiteralExpression(l, _)                   =>
+  case ExpressionF.LiteralExpression(l, _)                       =>
     val value = l match {
       case Literal.BoolLiteral(e)   => VBoolean(e)
       case Literal.StringLiteral(e) => VString(e)
@@ -31,7 +32,7 @@ def alg(e: ExpressionF[ExpressionValue]): ExpressionValue = e match {
       case Literal.RegexLiteral(e)  => Error
     }
     Kleisli(_ => value)
-  case ExpressionF.Binary(left, right, operator, commonType) =>
+  case ExpressionF.Binary(left, right, operator, commonType)     =>
     val v = ((left, right)).tupled.map { case (l, r) => (l, r, operator) }.map {
       case (left, right, Operator.Equal)                => VBoolean(left == right)
       case (left, right, Operator.Different)            => VBoolean(left != right)
@@ -50,11 +51,18 @@ def alg(e: ExpressionF[ExpressionValue]): ExpressionValue = e match {
       case _                                            => Error
     }
     v
-  case ExpressionF.FieldRef(value, _)                        =>
+  case ExpressionF.FunctionCallExpression("array", arguments, _) =>
     Kleisli { values =>
-      values.get(value).getOrElse(sys.error(s"Key not found $value in ${values.toString}"))
+      val k = arguments.map { argument =>
+        argument.run(values)
+      }
+      VArray(k.toList)
     }
-  case _                                                     => ???
+  case ExpressionF.FieldRef(tableId, fieldId, _)                 =>
+    Kleisli { values =>
+      values.get(fieldId).getOrElse(sys.error(s"Key not found $fieldId in ${values.toString}"))
+    }
+  case _                                                         => ???
 }
 
 def eval(e: ast.Expression): ExpressionValue =

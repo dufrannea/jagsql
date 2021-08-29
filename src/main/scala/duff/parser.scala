@@ -189,10 +189,18 @@ object parser {
       }
     }
 
+  def comaSeparatedWithSpace[K](p: Parser[K]): Parser[NonEmptyList[K]] = {
+    (p <* w.?).repSep(Parser.char(',') <* w.?)
+  }
+
+  def comaSeparatedBetweenParens[K](p: Parser[K]): Parser[NonEmptyList[K]] = {
+    Parser.char('(') *> w.? *> comaSeparatedWithSpace(p) <* w.? <* Parser.char(')')
+  }
+
   val expression: Parser[Expression] = Parser.recursive[Expression] { recurse =>
     val functionCall: Parser[(String, NonEmptyList[Expression])] =
-      (compositeIdentifier <* Parser
-        .char('(')) ~ (recurse.rep(1) <* Parser.char(')'))
+      (compositeIdentifier
+        ~ comaSeparatedBetweenParens(recurse))
 
     // backtracking on function call because of the ambiguity of the single
     // identifier vs identifier + parens for the functions
