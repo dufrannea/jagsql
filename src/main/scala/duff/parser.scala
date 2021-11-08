@@ -106,15 +106,13 @@ object parser {
     .charIn("ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_".toList)
     .rep
 
-  val compositeIdentifier: Parser[String] = {
+  val compositeIdentifier: Parser[String] =
     (identifier ~ (Parser.char('.') *> identifier).?).map { case (left, maybeRight) =>
       left.toList.mkString + (maybeRight match {
         case None        => ""
         case Some(chars) => "." + chars.toList.mkString
       })
     }
-
-  }
 
   val orAnd = List(
     (
@@ -186,13 +184,12 @@ object parser {
     Parser.string(s).map(_ => op)
   })
 
-  def binaryExpression(operator: Parser[BinaryOperator])(inner: Parser[Expression]) = {
+  def binaryExpression(operator: Parser[BinaryOperator])(inner: Parser[Expression]) =
     ((inner <* w.?) ~ (operator ~ (w.? *> inner <* w.?)).rep0).map { case (left, rightOperands) =>
       rightOperands.foldLeft(left) { case (acc, (op, current)) =>
         Binary(acc, current, Operator.B(op))
       }
     }
-  }
 
   val expression: Parser[Expression] = Parser.recursive[Expression] { recurse =>
     val functionCall: Parser[(String, NonEmptyList[Expression])] =

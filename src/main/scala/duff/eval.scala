@@ -57,6 +57,5 @@ def alg(e: ExpressionF[ExpressionValue]): ExpressionValue = e match {
   case _                                                     => ???
 }
 
-def eval(e: ast.Expression): ExpressionValue = {
+def eval(e: ast.Expression): ExpressionValue =
   cata(alg)(e)
-}

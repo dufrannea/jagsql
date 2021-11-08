@@ -245,7 +245,7 @@ def analyzeExpression(
 }
 
 // if a from clause is not present, consider we are selecting from STDIN
-def addEmptyStdin(s: cst.Statement.SelectStatement): cst.Statement.SelectStatement = {
+def addEmptyStdin(s: cst.Statement.SelectStatement): cst.Statement.SelectStatement =
   s match {
     case cst.Statement.SelectStatement(projections, None, maybeWhere, maybeGroupBy) =>
       cst
@@ -258,7 +258,6 @@ def addEmptyStdin(s: cst.Statement.SelectStatement): cst.Statement.SelectStateme
         )
     case _                                                                          => s
   }
-}
 
 def analyzeStatement(
   i: cst.Statement.SelectStatement
@@ -266,7 +265,7 @@ def analyzeStatement(
   val ss: ComplexType.Table = ComplexType.Table(NonEmptyMap.of("foo" -> SimpleType.Number))
   val s = addEmptyStdin(i)
 
-  def analyzeSource(f: cst.Source): Verified[ast.Source] = {
+  def analyzeSource(f: cst.Source): Verified[ast.Source] =
     f match {
       // TODO: there should be no special case here
       // for STDIN, it should be no different from a subquery or a table ref
@@ -298,7 +297,6 @@ def analyzeStatement(
           _        <- Verified.set(state + (alias -> function.tableType))
         } yield function
     }
-  }
 
   def validateFunction(source: cst.Source.TableFunction): Verified[Source] = {
     val fileFunType: ComplexType.Table = ComplexType.Table(NonEmptyMap.of("col_0" -> SimpleType.String))
@@ -311,22 +309,20 @@ def analyzeStatement(
 
   }
 
-  def analyzeFromSource(fromItem: cst.FromSource): Verified[ast.FromSource] = {
+  def analyzeFromSource(fromItem: cst.FromSource): Verified[ast.FromSource] =
     for {
       analyzedSource          <- analyzeSource(fromItem.source)
       maybeAnalyzedExpression <- fromItem
                                    .maybeJoinPredicates
                                    .traverse(analyzeExpression(_))
     } yield FromSource(analyzedSource, maybeAnalyzedExpression)
-  }
 
-  def analyzeFromClause(f: cst.FromClause): Verified[ast.FromClause] = {
+  def analyzeFromClause(f: cst.FromClause): Verified[ast.FromClause] =
     for {
       analyzedItems <-
         f.items
           .traverse(analyzeFromSource)
     } yield FromClause(analyzedItems)
-  }
 
   s match {
     case cst.Statement.SelectStatement(projections, from, maybeWhere, maybeGroupBy) =>

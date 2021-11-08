@@ -14,7 +14,7 @@ object Example extends IOApp {
 
   import scala.concurrent.duration._
 
-  def run(args: List[String]) = {
+  def run(args: List[String]) =
     (1 to 100)
       .toList
       .traverse_(_ =>
@@ -24,7 +24,6 @@ object Example extends IOApp {
         }
       )
       .as(ExitCode.Success)
-  }
 
   def run0(args: List[String]): IO[Either[Unit, Unit]] = {
 

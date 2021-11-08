@@ -21,12 +21,11 @@ import planner._
 
 case class Row(colValues: List[(String, Value)])
 
-private def unsafeEvalBool(e: Expression)(context: Map[String, Value]): Boolean = {
+private def unsafeEvalBool(e: Expression)(context: Map[String, Value]): Boolean =
   eval(e)(context) match {
     case Value.VBoolean(v) => v
     case _                 => sys.error("Not a boolean")
   }
-}
 
 val defaultStdInLines = stdinUtf8[IO](1024)
   .through(fs2.text.lines)
@@ -130,13 +129,12 @@ trait MaybeNeedsTopicApply extends Apply[MaybeNeedsTopic] {
   override def map[A, B](fa: MaybeNeedsTopic[A])(f: A => B) =
     EitherK(fa).map(f).run
 
-  override def ap[A, B](f: MaybeNeedsTopic[A => B])(fa: MaybeNeedsTopic[A]): MaybeNeedsTopic[B] = {
+  override def ap[A, B](f: MaybeNeedsTopic[A => B])(fa: MaybeNeedsTopic[A]): MaybeNeedsTopic[B] =
     (f, fa) match {
       case (Right(ff), Right(a)) => Right(ff(a))
       case (Left(ff), Right(a))  => Left(topic => ff(topic)(a))
       case (Right(ff), Left(a))  => Left(topic => ff(a(topic)))
       case (Left(ff), Left(a))   => Left(topic => ff(topic)(a(topic)))
     }
-  }
 
 }

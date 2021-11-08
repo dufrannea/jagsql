@@ -36,7 +36,7 @@ def toStage(fromClause: ast.FromClause): Stage =
     }
     .get
 
-def toStage(statement: Statement.SelectStatement): Stage = {
+def toStage(statement: Statement.SelectStatement): Stage =
   statement match {
     case Statement.SelectStatement(projections, fromClause, whereClause, groupByClause, _) =>
       val projectionStage = Stage.Projection(projections, toStage(fromClause))
@@ -50,5 +50,3 @@ def toStage(statement: Statement.SelectStatement): Stage = {
         case Some(ast.GroupByClause(expressions)) => Stage.GroupBy(expressions, filterStage)
       }
   }
-
-}
