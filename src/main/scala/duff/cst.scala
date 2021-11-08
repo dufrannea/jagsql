@@ -1,16 +1,17 @@
 package duff.jagsql
 package cst
 
-import cats.data
-import cats.data.NonEmptyList
+import duff.jagsql.cst.Literal.NumberLiteral
+import duff.jagsql.cst.Literal.RegexLiteral
+import duff.jagsql.cst.Literal.StringLiteral
+import duff.jagsql.cst.Projection
 
 import java.nio.file.Path
+
 import scala.math.BigDecimal
 
-import Literal.NumberLiteral
-import Literal.RegexLiteral
-import Literal.StringLiteral
-import cst.Projection
+import cats.data
+import cats.data.NonEmptyList
 
 enum Literal {
   case StringLiteral(a: String)

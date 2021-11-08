@@ -1,22 +1,18 @@
 package duff.jagsql
 
-import cats.data.NonEmptyList
-import cats.implicits._
-import cats.parse.Parser
-import cats.parse.Parser0
-import cats.syntax.align
+import duff.jagsql.cst._
+import duff.jagsql.cst.Expression._
+import duff.jagsql.cst.Statement._
 
-import scala.math.BigDecimal
-import scala.math.exp
-import scala.util.Failure
-import scala.util.Success
-import scala.util.Try
+import scala.annotation.internal.Alias
+import scala.math.{exp, BigDecimal}
+import scala.util.{Failure, Success, Try}
 import scala.util.matching.Regex
 
-import cst._
-import Expression._
-import Statement._
-import scala.annotation.internal.Alias
+import cats.data.NonEmptyList
+import cats.implicits._
+import cats.parse.{Parser, Parser0}
+import cats.syntax.align
 
 object parser {
   case class Position(from: Int, to: Int)
@@ -58,6 +54,8 @@ object parser {
   val stringLiteral: Parser[Literal.StringLiteral] =
     (singleQuote *> Parser.charWhere(_ != quoteChar).rep0 <* singleQuote)
       .map(k => Literal.string(k.mkString))
+
+  val diider = 1
 
   val integer: Parser[String] = Parser
     .charIn((0 to 9).map(_.toString()(0)))
@@ -311,5 +309,5 @@ object parser {
 
 }
 
-export parser.selectStatement
 export parser.literal
+export parser.selectStatement

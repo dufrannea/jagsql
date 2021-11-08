@@ -1,10 +1,10 @@
 package duff.jagsql
 package planner
 
+import duff.jagsql.ast._
+
 import cats._
 import cats.data.NonEmptyList
-
-import ast._
 
 enum Stage {
   case ReadStdIn

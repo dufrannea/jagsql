@@ -1,25 +1,24 @@
 package duff.jagsql
 
+import duff.jagsql.ast.{analyzeStatement, Scope}
+import duff.jagsql.parser.parse
+import duff.jagsql.planner.toStage
+import duff.jagsql.runner._
+
+import scala.collection.immutable.ArraySeq
+import scala.concurrent.duration._
+
 import cats._
 import cats.data.State
 import cats.effect.ExitCode
 import cats.effect.IO
 import cats.effect.IOApp
 import cats.implicits._
+import fs2._
+
 import com.monovore.decline.Command
 import com.monovore.decline.CommandApp
 import com.monovore.decline.Opts
-import fs2._
-
-import scala.collection.immutable.ArraySeq
-import scala.concurrent.duration._
-
-import parser.parse
-import ast.analyzeStatement
-import ast.Scope
-import planner.toStage
-import runner.toStream
-import runner._
 
 object Main extends IOApp {
 

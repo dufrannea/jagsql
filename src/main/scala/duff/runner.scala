@@ -1,23 +1,23 @@
 package duff.jagsql
 package runner
 
+import duff.jagsql.ast.Expression
+import duff.jagsql.ast.Projection
+import duff.jagsql.eval._
+import duff.jagsql.planner._
+import duff.jagsql.std.PersistentTopic
+
+import java.io.FileInputStream
+
 import cats._
 import cats.data.Binested
 import cats.data.EitherK
 import cats.data.Nested
 import cats.effect._
 import cats.implicits._
-import duff.jagsql.std.PersistentTopic
 import fs2.Stream
 import fs2.io._
 import fs2.text
-
-import java.io.FileInputStream
-
-import ast.Expression
-import ast.Projection
-import eval._
-import planner._
 
 case class Row(colValues: List[(String, Value)])
 

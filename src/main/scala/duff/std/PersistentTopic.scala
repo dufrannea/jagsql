@@ -1,13 +1,13 @@
 package duff.jagsql
 package std
 
-import fs2._
-import fs2.concurrent._
+import scala.collection.immutable.LongMap
 
 import cats.effect._
 import cats.effect.implicits._
 import cats.syntax.all._
-import scala.collection.immutable.LongMap
+import fs2._
+import fs2.concurrent._
 
 abstract class PersistentTopic[F[_], A] { self =>
 

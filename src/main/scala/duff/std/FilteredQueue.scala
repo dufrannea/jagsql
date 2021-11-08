@@ -1,16 +1,16 @@
 package duff.jagsql
 package std
 
+import duff.jagsql.std.FilteredQueue.State
+import duff.jagsql.std.FilteredQueue.Taker
+
+import scala.collection.immutable.Queue
+
 import cats._
 import cats.effect._
 import cats.effect.kernel.GenConcurrent
 import cats.implicits._
 import fs2._
-
-import scala.collection.immutable.Queue
-
-import FilteredQueue.Taker
-import FilteredQueue.State
 
 /** A Queue-like data structures that allows for a consumer to dequeue messages based on a predicate.
   *

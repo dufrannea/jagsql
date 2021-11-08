@@ -1,25 +1,21 @@
 package duff.jagsql
 package runner
 
+import java.nio.charset.StandardCharsets
+import java.nio.file.Files
+
+import scala.concurrent.duration._
+
 import cats._
 import cats.effect._
 import cats.effect.unsafe.IORuntime
 import cats.implicits._
 import fs2._
+
+import eval._
 import org.scalatest._
 import org.scalatest.freespec.AnyFreeSpec
 import org.scalatest.matchers.should.Matchers
-
-import scala.concurrent.duration._
-
-import eval._
-import java.nio.file.Files
-import java.nio.charset.StandardCharsets
-
-// # personal objectives
-// - articles, blog post
-// - display customer requests, have them vote on the product
-// - dataflow migration handling
 
 class runnerSpec extends RunnerDsl {
   val sourceList = List("lol", "http")
@@ -52,7 +48,7 @@ class runnerSpec extends RunnerDsl {
   })
 
   "SELECT in.col_0 FROM STDIN AS in WHERE in.col_0 = 'lol'" evalsTo (1, Vector(
-    Row(List(("col_0", Value.VString("lol")))),
+    Row(List(("col_0", Value.VString("lol"))))
   ))
 }
 

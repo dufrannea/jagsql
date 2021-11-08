@@ -1,17 +1,17 @@
 package duff.jagsql
 package ast
 
+import duff.jagsql.cst.Operator
+import duff.jagsql.std._
+
+import scala.language.experimental
+import scala.util.Try
+
 import cats._
 import cats.data.NonEmptyList
 import cats.data.NonEmptyMap
 import cats.data.State
 import cats.implicits._
-
-import scala.language.experimental
-import scala.util.Try
-
-import std._
-import cst.Operator
 
 enum SimpleType {
   case Number
@@ -117,8 +117,8 @@ enum Statement {
 
 }
 
-import cats.data.StateT
 import cats.data.EitherT
+import cats.data.StateT
 
 type Scope = Map[String, ComplexType.Table]
 
