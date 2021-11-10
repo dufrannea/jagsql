@@ -49,9 +49,4 @@ def toStage(statement: Statement.SelectStatement): Stage =
         case None                                 => filterStage
         case Some(ast.GroupByClause(expressions)) => Stage.GroupBy(expressions, filterStage)
       }
-
-      groupByClause match {
-        case None                                 => filterStage
-        case Some(ast.GroupByClause(expressions)) => Stage.GroupBy(expressions, filterStage)
-      }
   }

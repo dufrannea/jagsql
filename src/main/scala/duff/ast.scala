@@ -13,36 +13,33 @@ import cats.data.NonEmptyMap
 import cats.data.State
 import cats.implicits._
 
-enum SimpleType {
+enum SimpleType extends Type {
   case Number
   case String
   case Bool
-
 }
 
-enum ComplexType {
-  case Table(cols: NonEmptyMap[String, SimpleType])
+enum ComplexType extends Type {
+  case Table(cols: NonEmptyMap[String, Type])
   case Array(typeParameter: Type)
 }
 
-enum Type {
-  case Simple(st: SimpleType)
-  case Complex(st: ComplexType)
-  case Any
-}
+sealed trait Type
 
 object Type {
-  val Number = Type.Simple(SimpleType.Number)
-  val String = Type.Simple(SimpleType.String)
-  val Bool = Type.Simple(SimpleType.Bool)
-  def Table(cols: NonEmptyMap[String, SimpleType]) = Type.Complex(ComplexType.Table(cols))
+  val Number = SimpleType.Number
+  val String = SimpleType.String
+  val Bool = SimpleType.Bool
+
+  def Table(cols: NonEmptyMap[String, SimpleType]) = ComplexType.Table(cols)
 }
 
 import Type._
 
+// TODO: need generic types here, or completely erased
 enum Function(val args: List[Type], val returnType: Type, val maybeVariadic: Option[Type] = None) {
   case file extends Function(Type.String :: Nil, Type.String)
-  case max extends Function(Type.Number :: Nil, Type.Complex(ComplexType.Array(Type.Number)))
+  case max extends Function(Type.Number :: Nil, ComplexType.Array(Type.Number))
   case array extends Function(Nil, Type.Number, Some(Type.Number))
 }
 
@@ -102,12 +99,15 @@ case class FromSource(source: Source, joinPredicates: Option[Expression]) {
 }
 
 case class FromClause(items: NonEmptyList[FromSource])
+
 case class WhereClause(expression: Expression)
+
 case class GroupByClause(expressions: NonEmptyList[Expression])
 
 case class Projection(e: Expression, maybeAlias: Option[String])
 
 enum Statement {
+
   import cats.data.NonEmptyList
 
   case SelectStatement(
@@ -134,8 +134,11 @@ type Verified[K] = StateT[[A] =>> Either[String, A], Scope, K]
 
 object Verified {
   def read: Verified[Map[String, ComplexType.Table]] = StateT.get
+
   def set(s: Map[String, ComplexType.Table]): Verified[Unit] = StateT.set(s)
+
   def pure[K](k: K): Verified[K] = StateT.pure(k)
+
   def error(s: String): Verified[Nothing] = s.asLeft.liftTo[Verified]
 }
 
@@ -238,7 +241,7 @@ def analyzeExpression(
                       tableType.cols(fieldId) match {
                         case None            => s"Non existing field $fieldId on table $tableId".asLeft.liftTo[Verified]
                         case Some(fieldType) =>
-                          Fix(ExpressionF.FieldRef(tableId, fieldId, Type.Simple(fieldType))).asRight.liftTo[Verified]
+                          Fix(ExpressionF.FieldRef(tableId, fieldId, fieldType)).asRight.liftTo[Verified]
                       }
                     }
                   case _                         =>
@@ -388,9 +391,10 @@ def analyzeStatement(
                   .map { case (Projection(e, maybeAlias), index) =>
                     // TODO check that aliases are not repeated
                     val name = maybeAlias.getOrElse(s"col_$index")
-                    val expressionType = e.unfix.expressionType match {
-                      case Type.Simple(t) => t
-                      case _              => sys.error("Expressions should return only simple types")
+                    val expressionType: Type = e.unfix.expressionType match {
+                      case t: SimpleType        => t
+                      case t: ComplexType.Array => t
+                      case _                    => sys.error("Expressions should return only simple types or ARRAY")
                     }
 
                     name -> expressionType
