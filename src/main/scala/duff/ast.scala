@@ -36,19 +36,51 @@ object Type {
 
 import Type._
 
-// TODO: need generic types here, or completely erased
-enum Function(val args: List[Type], val returnType: Type, val maybeVariadic: Option[Type] = None) {
-  case file extends Function(Type.String :: Nil, Type.String)
-  case max extends Function(Type.Number :: Nil, ComplexType.Array(Type.Number))
-  case array extends Function(Nil, Type.Number, Some(Type.Number))
+object Function {
+
+  def valueOf(s: String): Function = {
+    s match {
+      case "file"  => file
+      case "array" => array
+      case "max"   => max
+      case _       => throw new IllegalArgumentException(s"No Function named $s")
+    }
+  }
+
 }
+
+// TODO: need generic types here, or completely erased
+sealed trait Function {
+  val args: List[Type]
+  val returnType: Type
+  val maybeVariadic: Option[Type] = None
+}
+
+case object file extends Function {
+  val args = Type.String :: Nil
+  val returnType = Type.String
+}
+
+case object array extends Function {
+  val args = Nil
+  val returnType = Type.Number
+  override val maybeVariadic: Option[Type] = Some(Type.Number)
+}
+
+sealed trait AggregateFunction(
+  val args: List[Type],
+  val returnType: Type,
+  override val maybeVariadic: Option[Type] = None
+) extends Function
+
+case object max extends AggregateFunction(Type.Number :: Nil, ComplexType.Array(Type.Number))
 
 enum ExpressionF[K] {
 
   def expressionType: Type
 
   case LiteralExpression(literal: cst.Literal, expressionType: Type)
-  case FunctionCallExpression(name: String, arguments: Seq[K], expressionType: Type)
+  case FunctionCallExpression(function: Function, arguments: Seq[K], expressionType: Type)
   case Binary(left: K, right: K, operator: cst.Operator, expressionType: Type)
   case Unary(expression: K, expressionType: Type)
   case FieldRef(tableId: String, fieldId: String, expressionType: Type)
@@ -183,7 +215,7 @@ def analyzeExpression(
             }
           }
           .liftTo[Verified]
-    } yield Fix(ExpressionF.FunctionCallExpression(name, analyzedArguments, function.returnType))
+    } yield Fix(ExpressionF.FunctionCallExpression(function, analyzedArguments, function.returnType))
 
   case cst.Expression.Binary(left, right, operator) =>
     for {
