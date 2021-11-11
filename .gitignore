@@ -6,3 +6,4 @@ target/
 .bsp
 .idea
 metals.sbt
+.gradle
