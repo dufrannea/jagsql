@@ -1,159 +1,16 @@
 package duff.jagsql
 package ast
 
+import duff.jagsql.ast.*
 import duff.jagsql.cst.Operator
-import duff.jagsql.std._
+import duff.jagsql.std.*
 
 import scala.language.experimental
 import scala.util.Try
 
-import cats._
-import cats.data.NonEmptyList
-import cats.data.NonEmptyMap
-import cats.data.State
-import cats.implicits._
-
-enum SimpleType extends Type {
-  case Number
-  case String
-  case Bool
-}
-
-enum ComplexType extends Type {
-  case Table(cols: NonEmptyMap[String, Type])
-  case Array(typeParameter: Type)
-}
-
-sealed trait Type
-
-object Type {
-  val Number = SimpleType.Number
-  val String = SimpleType.String
-  val Bool = SimpleType.Bool
-
-  def Table(cols: NonEmptyMap[String, SimpleType]) = ComplexType.Table(cols)
-}
-
-import Type._
-
-object Function {
-
-  def valueOf(s: String): Function = {
-    s match {
-      case "file"  => file
-      case "array" => array
-      case "max"   => max
-      case _       => throw new IllegalArgumentException(s"No Function named $s")
-    }
-  }
-
-}
-
-// TODO: need generic types here, or completely erased
-sealed trait Function {
-  val args: List[Type]
-  val returnType: Type
-  val maybeVariadic: Option[Type] = None
-}
-
-case object file extends Function {
-  val args = Type.String :: Nil
-  val returnType = Type.String
-}
-
-case object array extends Function {
-  val args = Nil
-  val returnType = Type.Number
-  override val maybeVariadic: Option[Type] = Some(Type.Number)
-}
-
-sealed trait AggregateFunction(
-  val args: List[Type],
-  val returnType: Type,
-  override val maybeVariadic: Option[Type] = None
-) extends Function
-
-case object max extends AggregateFunction(Type.Number :: Nil, ComplexType.Array(Type.Number))
-
-enum ExpressionF[K] {
-
-  def expressionType: Type
-
-  case LiteralExpression(literal: cst.Literal, expressionType: Type)
-  case FunctionCallExpression(function: Function, arguments: Seq[K], expressionType: Type)
-  case Binary(left: K, right: K, operator: cst.Operator, expressionType: Type)
-  case Unary(expression: K, expressionType: Type)
-  case FieldRef(tableId: String, fieldId: String, expressionType: Type)
-}
-
-object ExpressionF {
-
-  given Functor[ExpressionF] with
-
-    def map[A, B](fa: ExpressionF[A])(f: A => B): ExpressionF[B] = fa match {
-      case FunctionCallExpression(name, args, t) => FunctionCallExpression(name, args.map(f), t)
-      case Binary(left, right, operator, t)      => Binary(f(left), f(right), operator, t)
-      case Unary(e, t)                           => Unary(f(e), t)
-      case LiteralExpression(literal, t)         => LiteralExpression(literal, t)
-      case FieldRef(tableId, fieldId, t)         => FieldRef(tableId, fieldId, t)
-    }
-
-}
-
-type Expression = Fix[ExpressionF]
-
-sealed trait Source {
-
-  def tableType: ComplexType.Table
-}
-
-object Source {
-  val stdinType: ComplexType.Table = ComplexType.Table(NonEmptyMap.of("col_0" -> SimpleType.String))
-
-  case class StdIn(alias: String) extends Source {
-    def tableType = stdinType
-  }
-
-  case class TableRef(name: String, tableType: ComplexType.Table) extends Source
-
-  case class SubQuery(statement: Statement.SelectStatement, alias: String) extends Source {
-    def tableType = statement.tableType
-  }
-
-  case class TableFunction(name: String, args: List[cst.Literal], tableType: ComplexType.Table) extends Source
-
-}
-
-/** Statements
-  */
-case class FromSource(source: Source, joinPredicates: Option[Expression]) {
-  def tableType = source.tableType
-}
-
-case class FromClause(items: NonEmptyList[FromSource])
-
-case class WhereClause(expression: Expression)
-
-case class GroupByClause(expressions: NonEmptyList[Expression])
-
-case class Projection(e: Expression, maybeAlias: Option[String])
-
-enum Statement {
-
-  import cats.data.NonEmptyList
-
-  case SelectStatement(
-    projections: NonEmptyList[Projection],
-    fromClause: FromClause,
-    whereClause: Option[WhereClause] = None,
-    groupByClause: Option[GroupByClause] = None,
-    tableType: ComplexType.Table
-  )
-
-}
-
-import cats.data.EitherT
-import cats.data.StateT
+import cats.*
+import cats.data.*
+import cats.implicits.*
 
 type Scope = Map[String, ComplexType.Table]
 
@@ -183,6 +40,12 @@ def getLiteralType(l: cst.Literal) =
     case cst.Literal.NumberLiteral(_) => Type.Number
     case cst.Literal.BoolLiteral(_)   => Type.Bool
   }
+
+def filter(expression: ast.Expression, predicate: ExpressionF[Boolean] => Boolean) = {
+  def alg(e: ExpressionF[Boolean]): Boolean =
+    predicate(e)
+  cata(alg)(expression)
+}
 
 def analyzeExpression(
   e: cst.Expression
