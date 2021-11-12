@@ -372,8 +372,8 @@ def analyzeStatement(
 
   def isAggregateFunction(e: ast.Expression): Boolean = {
     e.unfix match {
-      case fce: ast.ExpressionF.FunctionCallExpression[_] => true
-      case _                                              => false
+      case ast.ExpressionF.FunctionCallExpression(f: AggregateFunction, _, _) => true
+      case _                                                                  => false
     }
   }
 
