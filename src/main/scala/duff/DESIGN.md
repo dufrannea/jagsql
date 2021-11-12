@@ -49,6 +49,9 @@ TODO:
 - implement DUAL
 - implement FILE (maybe file literal)
 - implement dirs
+- Have error codes
+- Link validation errors to position in code (parse with positions)
+- Format
 
 
 THOUGHTS:
