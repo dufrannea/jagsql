@@ -1,12 +1,12 @@
 package duff.jagsql.std
 
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 import scala.language.postfixOps
 
-import cats._
-import cats.effect._
-import cats.implicits._
-import fs2._
+import cats.*
+import cats.effect.*
+import cats.implicits.*
+import fs2.*
 
 import org.scalatest
 import org.scalatest.freespec.AnyFreeSpec

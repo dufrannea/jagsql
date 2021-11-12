@@ -1,14 +1,13 @@
 package duff.jagsql
 package eval
 
-import duff.jagsql.ast._
+import duff.jagsql.ast.*
 import duff.jagsql.cst.Literal
-import duff.jagsql.std._
+import duff.jagsql.std.*
 
-import cats._
-import cats.data.Kleisli
-import cats.data.Reader
-import cats.implicits._
+import cats.*
+import cats.data.{Kleisli, Reader}
+import cats.implicits.*
 
 enum Value {
   case VString(e: String)
@@ -18,8 +17,8 @@ enum Value {
   case Error
 }
 
-import Value._
-import cst.Operator
+import duff.jagsql.cst.Operator
+import duff.jagsql.eval.Value.*
 
 type ExpressionValue = Reader[Map[String, Value], Value]
 

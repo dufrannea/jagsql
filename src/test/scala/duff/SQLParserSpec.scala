@@ -1,20 +1,21 @@
 package duff.jagsql
 
+import duff.jagsql.cst.*
+import duff.jagsql.cst.Expression.*
+import duff.jagsql.cst.Literal.*
+import duff.jagsql.cst.Source.*
+import duff.jagsql.cst.Statement.*
+import duff.jagsql.parser.*
+
 import scala.language.postfixOps
 
 import cats.data.NonEmptyList
 import cats.parse.Parser
 import cats.syntax.group
 
-import cst._
-import cst.Expression._
-import cst.Literal._
-import cst.Source._
-import cst.Statement._
 import org.scalactic.anyvals.NonEmptyMap
 import org.scalatest.freespec.AnyFreeSpec
 import org.scalatest.matchers.should.Matchers
-import parser._
 
 class SQLParserSpec extends SqlParserTestDsl {
 

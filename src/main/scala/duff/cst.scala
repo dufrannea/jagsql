@@ -1,9 +1,7 @@
 package duff.jagsql
 package cst
 
-import duff.jagsql.cst.Literal.NumberLiteral
-import duff.jagsql.cst.Literal.RegexLiteral
-import duff.jagsql.cst.Literal.StringLiteral
+import duff.jagsql.cst.Literal.{NumberLiteral, RegexLiteral, StringLiteral}
 import duff.jagsql.cst.Projection
 
 import java.nio.file.Path

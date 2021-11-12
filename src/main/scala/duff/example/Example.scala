@@ -3,17 +3,17 @@ package example
 
 import duff.jagsql.std.PersistentTopic
 
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 
-import cats._
-import cats.effect._
+import cats.*
+import cats.effect.*
 import cats.effect.std.Queue
-import cats.implicits._
-import fs2._
+import cats.implicits.*
+import fs2.*
 
 object Example extends IOApp {
 
-  import scala.concurrent.duration._
+  import scala.concurrent.duration.*
 
   def run(args: List[String]) =
     (1 to 100)

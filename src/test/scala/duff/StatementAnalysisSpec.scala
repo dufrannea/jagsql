@@ -1,16 +1,16 @@
 package duff.jagsql
 package ast
 
+import duff.jagsql.parser.selectStatement
+import duff.jagsql.std.*
+
 import scala.language.postfixOps
 
-import cats.data.NonEmptyList
-import cats.data.NonEmptyMap
+import cats.data.{NonEmptyList, NonEmptyMap}
 
 import org.scalatest
 import org.scalatest.freespec.AnyFreeSpec
 import org.scalatest.matchers.should.Matchers
-import parser.selectStatement
-import std._
 
 class StatementAnalysisSpec extends StatementAnalysisDsl:
 
@@ -94,7 +94,7 @@ trait StatementAnalysisDsl extends AnyFreeSpec with Matchers:
   extension (c: String) {
 
     def analyzesTo(expected: ast.Statement.SelectStatement): Unit = {
-      import ast._
+      import ast.*
 
       c.toString in {
         analyze(c) match {

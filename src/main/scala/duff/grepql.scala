@@ -3,22 +3,18 @@ package duff.jagsql
 import duff.jagsql.ast.{analyzeStatement, Scope}
 import duff.jagsql.parser.parse
 import duff.jagsql.planner.toStage
-import duff.jagsql.runner._
+import duff.jagsql.runner.*
 
 import scala.collection.immutable.ArraySeq
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 
-import cats._
+import cats.*
 import cats.data.State
-import cats.effect.ExitCode
-import cats.effect.IO
-import cats.effect.IOApp
-import cats.implicits._
-import fs2._
+import cats.effect.{ExitCode, IO, IOApp}
+import cats.implicits.*
+import fs2.*
 
-import com.monovore.decline.Command
-import com.monovore.decline.CommandApp
-import com.monovore.decline.Opts
+import com.monovore.decline.{Command, CommandApp, Opts}
 
 object Main extends IOApp {
 

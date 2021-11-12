@@ -1,8 +1,8 @@
 package duff.jagsql
 package std
 
-import cats._
-import cats.implicits._
+import cats.*
+import cats.implicits.*
 
 case class Fix[F[_]](val unfix: F[Fix[F]])
 

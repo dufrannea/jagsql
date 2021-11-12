@@ -1,19 +1,20 @@
 package duff.jagsql
 package runner
 
+import duff.jagsql.eval.*
+
 import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 
-import cats._
-import cats.effect._
+import cats.*
+import cats.effect.*
 import cats.effect.unsafe.IORuntime
-import cats.implicits._
-import fs2._
+import cats.implicits.*
+import fs2.*
 
-import eval._
-import org.scalatest._
+import org.scalatest.*
 import org.scalatest.freespec.AnyFreeSpec
 import org.scalatest.matchers.should.Matchers
 
@@ -56,12 +57,11 @@ trait RunnerDsl extends AnyFreeSpec with Matchers {
   import cats.effect.unsafe.implicits.global
 
   private def evaluate(query: String, stdIn: Stream[IO, String]): IO[Vector[Row]] = {
+    import ast.{Scope, analyzeStatement}
+    import cats.data.State
     import parser.parse
-    import ast.analyzeStatement
     import planner.toStage
     import runner.toStream
-    import cats.data.State
-    import ast.Scope
 
     val stream = for {
       parsed   <- parse(query).leftMap(error => s"Error while parsing: $error")
@@ -72,8 +72,8 @@ trait RunnerDsl extends AnyFreeSpec with Matchers {
       stream = toStream(rootStage, stdIn)
     } yield stream
 
-    import fs2._
-    import cats.effect._
+    import cats.effect.*
+    import fs2.*
 
     stream match {
       case Left(e)  => sys.error(e.toString)
@@ -86,13 +86,13 @@ trait RunnerDsl extends AnyFreeSpec with Matchers {
   extension (c: String) {
 
     def evalsTo_(expected: Vector[Row])(using stdIn: Stream[IO, String]): IO[Unit] = {
-      import ast._
+      import ast.*
 
       evaluate(c, stdIn).map(v => require(v == expected))
     }
 
     def evalsTo(iterations: Int, expected: Vector[Row])(using stdIn: Stream[IO, String]) = {
-      import ast._
+      import ast.*
 
       s"$c" in {
         (0 to iterations).foreach { case i =>

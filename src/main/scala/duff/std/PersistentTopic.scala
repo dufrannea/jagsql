@@ -3,11 +3,11 @@ package std
 
 import scala.collection.immutable.LongMap
 
-import cats.effect._
-import cats.effect.implicits._
-import cats.syntax.all._
-import fs2._
-import fs2.concurrent._
+import cats.effect.*
+import cats.effect.implicits.*
+import cats.syntax.all.*
+import fs2.*
+import fs2.concurrent.*
 
 abstract class PersistentTopic[F[_], A] { self =>
 

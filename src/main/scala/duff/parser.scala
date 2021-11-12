@@ -1,8 +1,8 @@
 package duff.jagsql
 
-import duff.jagsql.cst._
-import duff.jagsql.cst.Expression._
-import duff.jagsql.cst.Statement._
+import duff.jagsql.cst.*
+import duff.jagsql.cst.Expression.*
+import duff.jagsql.cst.Statement.*
 
 import scala.annotation.internal.Alias
 import scala.math.{exp, BigDecimal}
@@ -10,7 +10,7 @@ import scala.util.{Failure, Success, Try}
 import scala.util.matching.Regex
 
 import cats.data.NonEmptyList
-import cats.implicits._
+import cats.implicits.*
 import cats.parse.{Parser, Parser0}
 import cats.syntax.align
 

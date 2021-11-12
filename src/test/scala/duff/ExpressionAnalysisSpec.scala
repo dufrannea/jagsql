@@ -1,17 +1,17 @@
 package duff.jagsql
 package ast
 
+import duff.jagsql.cst.{Expression, Literal}
+import duff.jagsql.parser.expression
+import duff.jagsql.std.*
+
 import scala.language.postfixOps
 
 import cats.data.State
 
-import cst.Expression
-import cst.Literal
 import org.scalatest
 import org.scalatest.freespec.AnyFreeSpec
 import org.scalatest.matchers.should.Matchers
-import parser.expression
-import std._
 
 class ExpressionAnalysisSpec extends AnalysisDsl:
 
@@ -124,7 +124,7 @@ trait AnalysisDsl extends AnyFreeSpec with Matchers:
   extension (c: String) {
 
     def analyzesTo(expected: ast.Expression): Unit = {
-      import ast._
+      import ast.*
 
       c.toString in {
         analyze(c) match {
