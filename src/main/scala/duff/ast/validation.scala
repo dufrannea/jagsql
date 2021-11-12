@@ -240,6 +240,24 @@ def analyzeStatement(
     }
   }
 
+  def checkDoNotContainAggregateFunctions(
+    expressions: NonEmptyList[ast.Expression]
+  ): Verified[NonEmptyList[ast.Expression]] = {
+    import cats.*
+    import cats.implicits.*
+
+    val isInvalid = expressions.exists(_.exists {
+      case ast.ExpressionF.FunctionCallExpression(f: AggregateFunction, _, _) => true
+      case _                                                                  => false
+    })
+
+    if (isInvalid)
+      "Expressions in GROUP BY clause should not contain aggregation functions".asLeft.liftTo[Verified]
+    else
+      expressions.asRight.liftTo[Verified]
+
+  }
+
   s match {
     case cst.Statement.SelectStatement(projections, from, maybeWhere, maybeGroupBy) =>
       for {
@@ -252,7 +270,13 @@ def analyzeStatement(
         maybeAnalyzedGroupBy <-
           maybeGroupBy
             .traverse { case groupBy =>
-              groupBy.expressions.traverse(analyzeExpression).map(GroupByClause.apply)
+              groupBy
+                .expressions
+                .traverse(analyzeExpression)
+                // need to check the expressions are aggregate function free
+                .flatMap(checkDoNotContainAggregateFunctions)
+                .map(GroupByClause.apply)
+
             }
         analyzedProjections  <- projections.traverse { case cst.Projection(expression, alias) =>
                                   analyzeExpression(expression).map(e => Projection(e, alias))

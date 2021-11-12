@@ -1,6 +1,7 @@
 package duff.jagsql
 package ast
 
+import duff.jagsql.ast.ExpressionF.{Binary, FieldRef, FunctionCallExpression, LiteralExpression, Unary}
 import duff.jagsql.cst.Operator
 import duff.jagsql.std.*
 
@@ -73,6 +74,23 @@ object ExpressionF {
       case FieldRef(tableId, fieldId, t)         => FieldRef(tableId, fieldId, t)
     }
 
+  extension (e: Expression) {
+    def exists(p: ExpressionF[_] => Boolean) = cata(existsAlg(p))(e)
+    def forAll(p: ExpressionF[_] => Boolean) = cata(allAlg(p))(e)
+  }
+
+}
+
+def allAlg(p: ExpressionF[_] => Boolean)(a: ExpressionF[Boolean]): Boolean = a match {
+  case r @ FunctionCallExpression(name, args, t) => p(r) && args.forall(_ == true)
+  case r @ Binary(left, right, operator, t)      => p(r) && left && right
+  case r                                         => p(r)
+}
+
+def existsAlg(p: ExpressionF[_] => Boolean)(a: ExpressionF[Boolean]): Boolean = a match {
+  case r @ FunctionCallExpression(name, args, t) => p(r) || args.exists(_ == true)
+  case r @ Binary(left, right, operator, t)      => p(r) || left || right
+  case r                                         => p(r)
 }
 
 type Expression = Fix[ExpressionF]

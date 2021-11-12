@@ -64,6 +64,14 @@ class StatementAnalysisSpec extends StatementAnalysisDsl:
 
     "SELECT 1 FROM (SELECT 1 AS bar, 2 AS baz) AS foo GROUP BY foo.bar" succeeds
 
+    "SELECT 1 FROM (SELECT 1 AS bar, 2 AS baz) AS foo GROUP BY max(foo.bar)" fails
+
+    "SELECT 1 FROM (SELECT 1 AS bar, 2 AS baz) AS foo GROUP BY foo.bar, max(foo.bar)" fails
+
+    "SELECT 1 FROM (SELECT 1 AS bar, 2 AS baz) AS foo GROUP BY foo.bar, array(foo.bar)" succeeds
+
+    "SELECT 1 FROM (SELECT 1 AS bar, 2 AS baz) AS foo GROUP BY foo.bar, array(max(foo.bar))" fails
+
   }
 
 trait StatementAnalysisDsl extends AnyFreeSpec with Matchers:
