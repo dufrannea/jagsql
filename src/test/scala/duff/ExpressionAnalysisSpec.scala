@@ -1,15 +1,15 @@
 package duff.jagsql
 package ast
 
-import cats.data.State
-import org.scalatest
-import org.scalatest.freespec.AnyFreeSpec
-import org.scalatest.matchers.should.Matchers
-
 import scala.language.postfixOps
+
+import cats.data.State
 
 import cst.Expression
 import cst.Literal
+import org.scalatest
+import org.scalatest.freespec.AnyFreeSpec
+import org.scalatest.matchers.should.Matchers
 import parser.expression
 import std._
 
@@ -157,4 +157,5 @@ trait AnalysisDsl extends AnyFreeSpec with Matchers:
           case Right(result) => fail("expected error")
         }
       }
+
   }

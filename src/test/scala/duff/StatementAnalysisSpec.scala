@@ -1,16 +1,16 @@
 package duff.jagsql
 package ast
 
+import scala.language.postfixOps
+
 import cats.data.NonEmptyList
 import cats.data.NonEmptyMap
+
 import org.scalatest
 import org.scalatest.freespec.AnyFreeSpec
 import org.scalatest.matchers.should.Matchers
-
-import scala.language.postfixOps
-
-import std._
 import parser.selectStatement
+import std._
 
 class StatementAnalysisSpec extends StatementAnalysisDsl:
 
@@ -60,9 +60,9 @@ class StatementAnalysisSpec extends StatementAnalysisDsl:
 
     "SELECT max(foo.baz) FROM (SELECT 1 AS bar, 2 AS baz) AS foo GROUP BY foo.bar" succeeds
 
-    "SELECT foo.bar + 1 FROM (SELECT 1 AS bar, 2 AS baz) AS foo GROUP BY foo.bar + 1" succeeds 
+    "SELECT foo.bar + 1 FROM (SELECT 1 AS bar, 2 AS baz) AS foo GROUP BY foo.bar + 1" succeeds
 
-    "SELECT 1 FROM (SELECT 1 AS bar, 2 AS baz) AS foo GROUP BY foo.bar" succeeds 
+    "SELECT 1 FROM (SELECT 1 AS bar, 2 AS baz) AS foo GROUP BY foo.bar" succeeds
 
   }
 

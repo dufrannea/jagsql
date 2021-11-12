@@ -1,18 +1,18 @@
 package duff.jagsql
 package eval
 
+import scala.language.postfixOps
+
 import cats._
 import cats.data.State
 import cats.implicits._
-import org.scalatest
-import org.scalatest.freespec.AnyFreeSpec
-import org.scalatest.matchers.should.Matchers
-
-import scala.language.postfixOps
 
 import ast._
 import cst.Expression
 import cst.Literal
+import org.scalatest
+import org.scalatest.freespec.AnyFreeSpec
+import org.scalatest.matchers.should.Matchers
 import parser.expression
 
 class evalSpec extends EvalDsl:

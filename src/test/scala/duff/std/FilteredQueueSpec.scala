@@ -1,16 +1,18 @@
 package duff.jagsql.std
 
+import java.nio.file.DirectoryStream.Filter
+
+import scala.concurrent.duration._
+import scala.language.postfixOps
+
 import cats._
 import cats.effect._
 import cats.implicits._
 import fs2._
+
 import org.scalatest
 import org.scalatest.freespec.AnyFreeSpec
 import org.scalatest.matchers.should.Matchers
-
-import scala.concurrent.duration._
-import scala.language.postfixOps
-import java.nio.file.DirectoryStream.Filter
 
 class FilteredQueueSpec extends AnyFreeSpec with Matchers {
   import cats.effect.unsafe.implicits.global
