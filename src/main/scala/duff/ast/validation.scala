@@ -2,6 +2,7 @@ package duff.jagsql
 package ast
 
 import duff.jagsql.ast.*
+import duff.jagsql.ast.ExpressionF.{Binary, FieldRef, FunctionCallExpression, LiteralExpression, Unary}
 import duff.jagsql.cst.Operator
 import duff.jagsql.std.*
 
@@ -240,21 +241,77 @@ def analyzeStatement(
     }
   }
 
+  // aggregate function not containing other aggregate functions
+  def isOneLevelAggregateFunction(e: ast.Expression): Boolean = {
+    e.unfix match {
+      case ast.ExpressionF.FunctionCallExpression(f: AggregateFunction, arguments, _) =>
+        !arguments.exists(containAggregateFunction)
+      case _                                                                          => false
+    }
+  }
+
+  def containAggregateFunction(e: ast.Expression): Boolean =
+    e.exists {
+      case ast.ExpressionF.FunctionCallExpression(f: AggregateFunction, _, _) => true
+      case _                                                                  => false
+    }
+
   def checkDoNotContainAggregateFunctions(
     expressions: NonEmptyList[ast.Expression]
   ): Verified[NonEmptyList[ast.Expression]] = {
-    import cats.*
-    import cats.implicits.*
 
-    val isInvalid = expressions.exists(_.exists {
-      case ast.ExpressionF.FunctionCallExpression(f: AggregateFunction, _, _) => true
-      case _                                                                  => false
-    })
+    val isInvalid = expressions.exists(containAggregateFunction)
 
     if (isInvalid)
       "Expressions in GROUP BY clause should not contain aggregation functions".asLeft.liftTo[Verified]
     else
       expressions.asRight.liftTo[Verified]
+
+  }
+
+  def containsOnlyStaticOrGroupedByExpressions(
+    e: ast.Expression,
+    groupByExpressions: NonEmptySet[ast.Expression]
+  ): Boolean = ???
+
+  /** Check that projections are valid with respect to group by expressions, that is to say they are either:
+    *   - pure
+    *   - aggregates of anything are ok as long as they do not contain aggregates themselves
+    *   - non aggregates are okay only if composing grouped by expressions
+    */
+  def isValidWithRespectToGroupBy(
+    e: ast.Expression,
+    groupByExpressions: Set[ast.Expression]
+  ): Either[String, List[ast.Expression]] = {
+
+    if (groupByExpressions.contains(e)) {
+      Right(e :: Nil)
+    } else {
+      e.unfix match {
+        case FunctionCallExpression(func: AggregateFunction, args, t) =>
+          val invalid = args.filter(containAggregateFunction)
+          if (invalid.nonEmpty)
+            Left(s"Cannot nest aggregate functions in ${invalid}")
+          else
+            Right(args.toList)
+        case FunctionCallExpression(func, args, t)                    =>
+          args
+            .toList
+            .flatTraverse(
+              isValidWithRespectToGroupBy(_, groupByExpressions)
+            )
+        case Binary(left, right, operator, t)                         =>
+          for {
+            l <- isValidWithRespectToGroupBy(left, groupByExpressions)
+            r <- isValidWithRespectToGroupBy(right, groupByExpressions)
+          } yield (l ++ r)
+        case LiteralExpression(literal, t)                            =>
+          Right(Nil)
+        case Unary(e, t)                                              => sys.error("Not supported")
+        case _                                                        =>
+          Left(s"Not in GROUP BY: $e")
+      }
+    }
 
   }
 
@@ -285,17 +342,24 @@ def analyzeStatement(
                                   .flatMap { g =>
                                     val allowedExpressions = g.expressions.toList.toSet
 
-                                    val errors = analyzedProjections.collect {
-                                      case projection
-                                          if !allowedExpressions.contains(projection.e) && !isAggregateFunction(
-                                            projection.e
-                                          ) && !projection.e.unfix.isInstanceOf[ExpressionF.LiteralExpression[_]] =>
-                                        s"$projection should be part of GROUP BY expressions, a literal or an aggregate function"
+                                    // val e: Either[String, List[Expression]] =
+                                    analyzedProjections.foldMap(k => isValidWithRespectToGroupBy(k.e, allowedExpressions)) match {
+                                      case Left(error)     => Some(error)
+                                      case Right(datasets) => None
+
                                     }
-                                    if (errors.isEmpty)
-                                      None
-                                    else
-                                      Some(errors.mkString(","))
+
+                                  // val errors = analyzedProjections.collect {
+                                  //  case projection
+                                  //      if !allowedExpressions.contains(projection.e) && !isAggregateFunction(
+                                  //        projection.e
+                                  //      ) && !projection.e.unfix.isInstanceOf[ExpressionF.LiteralExpression[_]] =>
+                                  //    s"$projection should be part of GROUP BY expressions, a literal or an aggregate function"
+                                  // }
+                                  // if (errors.isEmpty)
+                                  //  None
+                                  // else
+                                  //  Some(errors.mkString(","))
                                   }
                                   .toLeft(())
                                   .liftTo[Verified]

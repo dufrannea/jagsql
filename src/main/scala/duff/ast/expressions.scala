@@ -43,13 +43,14 @@ case object array extends Function {
   override val maybeVariadic: Option[Type] = Some(Type.Number)
 }
 
+// TODO: AggregationFunction takes only one argument ?
 sealed trait AggregateFunction(
   val args: List[Type],
   val returnType: Type,
   override val maybeVariadic: Option[Type] = None
 ) extends Function
 
-case object max extends AggregateFunction(Type.Number :: Nil, ComplexType.Array(Type.Number))
+case object max extends AggregateFunction(Type.Number :: Nil, Type.Number)
 
 enum ExpressionF[K] {
 

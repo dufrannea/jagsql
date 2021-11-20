@@ -307,6 +307,20 @@ class SQLParserSpec extends SqlParserTestDsl {
       "SELECT 1 FROM foo GROUP BY 1" parses
 
       "SELECT 1 AS bar FROM foo GROUP BY bar" parses
+
+      "SELECT 1 AS bar FROM (SELECT 1 AS lol) AS foo GROUP BY bar + 1, bar, bar - 2" parses
+
+      // |  ,CAST(1 AS STRING) AS two
+      """|SELECT
+         |  1 AS one
+         |  , 1 * 42 AS three
+         |  ,a.b + 1 AS four
+         |  ,a.d -1 AS five
+         |  ,a.d -1 + 1 AS six
+         |  ,max(a.c - 1) + 1 AS seven
+         |FROM
+         |  (SELECT 1 AS b, 1 AS d, 1 AS c) AS a
+         |GROUP BY a.b, a.d - 1""".stripMargin parses
     }
 
     "Identifiers" - {

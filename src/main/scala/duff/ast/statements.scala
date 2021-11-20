@@ -45,17 +45,25 @@ case class FromClause(items: NonEmptyList[FromSource])
 case class WhereClause(expression: Expression)
 
 // SELECT
-//    -- literals always accepted
+//    -- pure expressions always accepted
 //    1,
+//    CAST(1 AS STRING),
+//    1 * 42,
 //    -- a.b is grouped by so any expression
 //    -- based on it is alright without aggregation
 //    a.b + 1,
+//   -- this is legit
+//    a.d - 1,
+//    a.d - 1 + 1, -- this is hard, it could be parsed as Minus(a.d, Plus(1, 1)),
+//                 -- making it impossible to identify the aggregate expression here
+//                 -- maybe we should represent the expressions differently
+//                 -- (associate operations as lists Plus(List(a,b,c,d)) instead of binaries
 //    -- aggregate function are authorized
 //    -- over arbitrary expressions and composed
 //    -- into arbitrary expressions
 //    MAX(a.c - 1) + 1
 // (...)
-// GROUP BY a.b
+// GROUP BY a.b, a.d - 1
 //
 // GroupByClause(groupBy: any expression that is not an aggregate)
 //
