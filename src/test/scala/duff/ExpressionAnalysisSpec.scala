@@ -41,7 +41,7 @@ class ExpressionAnalysisSpec extends AnalysisDsl:
 
     val ef = ast
       .ExpressionF
-      .Binary(left, left, cst.Operator.B(cst.BinaryOperator.Plus), ast.Type.Number)
+      .Binary(left, left, cst.Operator.Plus, ast.Type.Number)
     Fix(ef)
   }
 

@@ -185,7 +185,7 @@ object parser {
   def binaryExpression(operator: Parser[BinaryOperator])(inner: Parser[Expression]) =
     ((inner <* w.?) ~ (operator ~ (w.? *> inner <* w.?)).rep0).map { case (left, rightOperands) =>
       rightOperands.foldLeft(left) { case (acc, (op, current)) =>
-        Binary(acc, current, Operator.B(op))
+        Binary(acc, current, op)
       }
     }
 

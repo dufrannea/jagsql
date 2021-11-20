@@ -91,20 +91,20 @@ class SQLParserSpec extends SqlParserTestDsl {
     "'salut'" parsesTo (LiteralExpression(StringLiteral("salut")): Expression)
     "1" parsesTo (LiteralExpression(NumberLiteral(BigDecimal("1"))): Expression)
 
-    "1 = 1" parsesTo (Binary(one, one, Operator.B(BinaryOperator.Equal)))
-    "1 != 1" parsesTo (Binary(one, one, Operator.B(BinaryOperator.Different)))
-    "1 <= 1" parsesTo (Binary(one, one, Operator.B(BinaryOperator.LessEqual)))
-    "1 >= 1" parsesTo (Binary(one, one, Operator.B(BinaryOperator.MoreEqual)))
-    "1 < 1" parsesTo (Binary(one, one, Operator.B(BinaryOperator.Less)))
-    "1 > 1" parsesTo (Binary(one, one, Operator.B(BinaryOperator.More)))
-    "1 + 1" parsesTo (Binary(one, one, Operator.B(BinaryOperator.Plus)))
-    "1 - 1" parsesTo (Binary(one, one, Operator.B(BinaryOperator.Minus)))
-    "1 / 1" parsesTo (Binary(one, one, Operator.B(BinaryOperator.Divided)))
-    "1 * 1" parsesTo (Binary(one, one, Operator.B(BinaryOperator.Times)))
+    "1 = 1" parsesTo (Binary(one, one, BinaryOperator.Equal))
+    "1 != 1" parsesTo (Binary(one, one, BinaryOperator.Different))
+    "1 <= 1" parsesTo (Binary(one, one, BinaryOperator.LessEqual))
+    "1 >= 1" parsesTo (Binary(one, one, BinaryOperator.MoreEqual))
+    "1 < 1" parsesTo (Binary(one, one, BinaryOperator.Less))
+    "1 > 1" parsesTo (Binary(one, one, BinaryOperator.More))
+    "1 + 1" parsesTo (Binary(one, one, BinaryOperator.Plus))
+    "1 - 1" parsesTo (Binary(one, one, BinaryOperator.Minus))
+    "1 / 1" parsesTo (Binary(one, one, BinaryOperator.Divided))
+    "1 * 1" parsesTo (Binary(one, one, BinaryOperator.Times))
     "1 * 1 * 1" parsesTo Binary(
-      Binary(one, one, Operator.B(BinaryOperator.Times)),
+      Binary(one, one, BinaryOperator.Times),
       one,
-      Operator.B(BinaryOperator.Times)
+      BinaryOperator.Times
     )
     "true && false" parsesTo (Binary(ttrue, tfalse, Operator.And))
 
@@ -118,48 +118,48 @@ class SQLParserSpec extends SqlParserTestDsl {
     "('salut')" parsesTo (LiteralExpression(StringLiteral("salut")): Expression)
     "(1)" parsesTo (LiteralExpression(NumberLiteral(BigDecimal("1"))): Expression)
 
-    "(1 = 1)" parsesTo (Binary(one, one, Operator.B(BinaryOperator.Equal)))
-    "(1 != 1)" parsesTo (Binary(one, one, Operator.B(BinaryOperator.Different)))
-    "(1 <= 1)" parsesTo (Binary(one, one, Operator.B(BinaryOperator.LessEqual)))
-    "(1 >= 1)" parsesTo (Binary(one, one, Operator.B(BinaryOperator.MoreEqual)))
-    "(1 < 1)" parsesTo (Binary(one, one, Operator.B(BinaryOperator.Less)))
-    "(1 > 1)" parsesTo (Binary(one, one, Operator.B(BinaryOperator.More)))
-    "(1 + 1)" parsesTo (Binary(one, one, Operator.B(BinaryOperator.Plus)))
-    "(1 - 1)" parsesTo (Binary(one, one, Operator.B(BinaryOperator.Minus)))
-    "(1 / 1)" parsesTo (Binary(one, one, Operator.B(BinaryOperator.Divided)))
-    "(1 * 1)" parsesTo (Binary(one, one, Operator.B(BinaryOperator.Times)))
-    "(((1 * 1)))" parsesTo (Binary(one, one, Operator.B(BinaryOperator.Times)))
+    "(1 = 1)" parsesTo (Binary(one, one, (BinaryOperator.Equal)))
+    "(1 != 1)" parsesTo (Binary(one, one, (BinaryOperator.Different)))
+    "(1 <= 1)" parsesTo (Binary(one, one, (BinaryOperator.LessEqual)))
+    "(1 >= 1)" parsesTo (Binary(one, one, (BinaryOperator.MoreEqual)))
+    "(1 < 1)" parsesTo (Binary(one, one, (BinaryOperator.Less)))
+    "(1 > 1)" parsesTo (Binary(one, one, (BinaryOperator.More)))
+    "(1 + 1)" parsesTo (Binary(one, one, (BinaryOperator.Plus)))
+    "(1 - 1)" parsesTo (Binary(one, one, (BinaryOperator.Minus)))
+    "(1 / 1)" parsesTo (Binary(one, one, (BinaryOperator.Divided)))
+    "(1 * 1)" parsesTo (Binary(one, one, (BinaryOperator.Times)))
+    "(((1 * 1)))" parsesTo (Binary(one, one, (BinaryOperator.Times)))
 
     "1 + 1 + 1" parsesTo Binary(
-      Binary(one, one, Operator.B(BinaryOperator.Plus)),
+      Binary(one, one, (BinaryOperator.Plus)),
       one,
-      Operator.B(BinaryOperator.Plus)
+      (BinaryOperator.Plus)
     )
 
     "1 + (1 * 1)" parsesTo Binary(
       one,
-      Binary(one, one, Operator.B(BinaryOperator.Times)),
-      Operator.B(BinaryOperator.Plus)
+      Binary(one, one, (BinaryOperator.Times)),
+      (BinaryOperator.Plus)
     )
 
     "(1 * 1) + 1" parses
 
     "(1 * 1) + (1 * 1)" parsesTo (Binary(
-      (Binary(one, one, Operator.B(BinaryOperator.Times))),
-      (Binary(one, one, Operator.B(BinaryOperator.Times))),
-      Operator.B(BinaryOperator.Plus)
+      (Binary(one, one, (BinaryOperator.Times))),
+      (Binary(one, one, (BinaryOperator.Times))),
+      (BinaryOperator.Plus)
     ))
 
     "1 + 1 * 1" parsesTo Binary(
       one,
-      Binary(one, one, Operator.B(BinaryOperator.Times)),
-      Operator.B(BinaryOperator.Plus)
+      Binary(one, one, (BinaryOperator.Times)),
+      (BinaryOperator.Plus)
     )
 
     "1 * 1 + 1" parsesTo Binary(
-      Binary(one, one, Operator.B(BinaryOperator.Times)),
+      Binary(one, one, (BinaryOperator.Times)),
       one,
-      Operator.B(BinaryOperator.Plus)
+      (BinaryOperator.Plus)
     )
   }
 

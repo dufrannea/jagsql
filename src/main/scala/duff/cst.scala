@@ -24,32 +24,29 @@ object Literal {
   def regex(s: String): RegexLiteral = RegexLiteral(s)
 }
 
-enum BinaryOperator {
+enum BinaryOperator extends Operator {
   case Equal, Different, Less, More, LessEqual, MoreEqual, Plus, Minus, Times, Divided, Or, And
 }
 
-enum UnaryOperator {
+enum UnaryOperator extends Operator {
   case Not
 }
 
-enum Operator {
-  case B(op: BinaryOperator)
-  case U(op: UnaryOperator)
-}
+sealed trait Operator
 
 object Operator {
-  val Equal = B(BinaryOperator.Equal)
-  val Different = B(BinaryOperator.Different)
-  val Less = B(BinaryOperator.Less)
-  val More = B(BinaryOperator.More)
-  val LessEqual = B(BinaryOperator.LessEqual)
-  val MoreEqual = B(BinaryOperator.MoreEqual)
-  val Plus = B(BinaryOperator.Plus)
-  val Minus = B(BinaryOperator.Minus)
-  val Times = B(BinaryOperator.Times)
-  val Divided = B(BinaryOperator.Divided)
-  val Or = B(BinaryOperator.Or)
-  val And = B(BinaryOperator.And)
+  val Equal = BinaryOperator.Equal
+  val Different = BinaryOperator.Different
+  val Less = BinaryOperator.Less
+  val More = BinaryOperator.More
+  val LessEqual = BinaryOperator.LessEqual
+  val MoreEqual = BinaryOperator.MoreEqual
+  val Plus = BinaryOperator.Plus
+  val Minus = BinaryOperator.Minus
+  val Times = BinaryOperator.Times
+  val Divided = BinaryOperator.Divided
+  val Or = BinaryOperator.Or
+  val And = BinaryOperator.And
 }
 
 case class Projection(expression: Expression, maybeAlias: Option[String] = None)
