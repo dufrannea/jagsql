@@ -14,14 +14,13 @@ import cats.implicits.*
 
 object Function {
 
-  def valueOf(s: String): Function = {
+  def valueOf(s: String): Function =
     s match {
       case "file"  => file
       case "array" => array
       case "max"   => max
       case _       => throw new IllegalArgumentException(s"No Function named $s")
     }
-  }
 
 }
 

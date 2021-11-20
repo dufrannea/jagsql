@@ -37,12 +37,11 @@ trait EvalDsl extends AnyFreeSpec with Matchers:
   private def analyze(c: String): Either[String, ast.Expression] =
     analyze(expression.parseAll(c).getOrElse(sys.error("testspec is wrong, cannot parse input")))
 
-  def evaluate(c: String): Either[String, Value] = {
+  def evaluate(c: String): Either[String, Value] =
     for {
       analyzed  <- analyze(c)
       evaluated <- eval(analyzed).asRight
     } yield evaluated(Map.empty)
-  }
 
   extension (c: String) {
 

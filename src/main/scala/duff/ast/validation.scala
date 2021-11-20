@@ -234,21 +234,19 @@ def analyzeStatement(
           .traverse(analyzeFromSource)
     } yield FromClause(analyzedItems)
 
-  def isAggregateFunction(e: ast.Expression): Boolean = {
+  def isAggregateFunction(e: ast.Expression): Boolean =
     e.unfix match {
       case ast.ExpressionF.FunctionCallExpression(f: AggregateFunction, _, _) => true
       case _                                                                  => false
     }
-  }
 
   // aggregate function not containing other aggregate functions
-  def isOneLevelAggregateFunction(e: ast.Expression): Boolean = {
+  def isOneLevelAggregateFunction(e: ast.Expression): Boolean =
     e.unfix match {
       case ast.ExpressionF.FunctionCallExpression(f: AggregateFunction, arguments, _) =>
         !arguments.exists(containAggregateFunction)
       case _                                                                          => false
     }
-  }
 
   def containAggregateFunction(e: ast.Expression): Boolean =
     e.exists {
@@ -282,8 +280,7 @@ def analyzeStatement(
   def isValidWithRespectToGroupBy(
     e: ast.Expression,
     groupByExpressions: Set[ast.Expression]
-  ): Either[String, List[ast.Expression]] = {
-
+  ): Either[String, List[ast.Expression]] =
     if (groupByExpressions.contains(e)) {
       Right(e :: Nil)
     } else {
@@ -312,8 +309,6 @@ def analyzeStatement(
           Left(s"Not in GROUP BY: $e")
       }
     }
-
-  }
 
   s match {
     case cst.Statement.SelectStatement(projections, from, maybeWhere, maybeGroupBy) =>

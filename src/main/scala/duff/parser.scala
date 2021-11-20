@@ -189,13 +189,11 @@ object parser {
       }
     }
 
-  def comaSeparatedWithSpace[K](p: Parser[K]): Parser[NonEmptyList[K]] = {
+  def comaSeparatedWithSpace[K](p: Parser[K]): Parser[NonEmptyList[K]] =
     (p <* w.?).repSep(Parser.char(',') <* w.?)
-  }
 
-  def comaSeparatedBetweenParens[K](p: Parser[K]): Parser[NonEmptyList[K]] = {
+  def comaSeparatedBetweenParens[K](p: Parser[K]): Parser[NonEmptyList[K]] =
     Parser.char('(') *> w.? *> comaSeparatedWithSpace(p) <* w.? <* Parser.char(')')
-  }
 
   val expression: Parser[Expression] = Parser.recursive[Expression] { recurse =>
     val functionCall: Parser[(String, NonEmptyList[Expression])] =

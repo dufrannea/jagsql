@@ -145,8 +145,8 @@ class SQLParserSpec extends SqlParserTestDsl {
     "(1 * 1) + 1" parses
 
     "(1 * 1) + (1 * 1)" parsesTo (Binary(
-      (Binary(one, one, (BinaryOperator.Times))),
-      (Binary(one, one, (BinaryOperator.Times))),
+      (Binary(one, one, BinaryOperator.Times)),
+      (Binary(one, one, BinaryOperator.Times)),
       (BinaryOperator.Plus)
     ))
 
