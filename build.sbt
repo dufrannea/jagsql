@@ -19,6 +19,7 @@ lazy val root = project
     libraryDependencies += "com.novocode" % "junit-interface" % "0.11" % "test",
     libraryDependencies += "co.fs2" % "fs2-core_3" % "3.0.4",
     libraryDependencies += "co.fs2" % "fs2-io_3" % "3.0.4",
+    libraryDependencies += "org.typelevel" % "shapeless3-deriving_3" % "3.0.4",
     test / envVars := Map("SCALACTIC_FILL_FILE_PATHNAMES" -> "yes"),
     scalacOptions ++= Seq(
       "-deprecation", // Emit warning and location for usages of deprecated APIs.
@@ -26,7 +27,8 @@ lazy val root = project
       "-language:existentials", // Existential types (besides wildcard types) can be written and inferred
       "-language:higherKinds", // Allow higher-kinded types
       "-unchecked", // Enable additional warnings where generated code depends on assumptions.
-      "-Xfatal-warnings" // Fail the compilation if there are any warnings.
+      "-Xfatal-warnings", // Fail the compilation if there are any warnings.
+      "-Xmax-inlines", "1000"
     ),
     assembly / mainClass := Some("duff.jagsql.Main")
   )

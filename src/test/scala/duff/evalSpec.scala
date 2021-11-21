@@ -2,7 +2,7 @@ package duff.jagsql
 package eval
 
 import duff.jagsql.ast.*
-import duff.jagsql.cst.{Expression, Literal}
+import duff.jagsql.cst.{Expression, Indexed, Literal}
 import duff.jagsql.parser.expression
 
 import scala.language.postfixOps
@@ -32,7 +32,8 @@ class evalSpec extends EvalDsl:
 
 trait EvalDsl extends AnyFreeSpec with Matchers:
 
-  private def analyze(e: cst.Expression): Either[String, ast.Expression] = analyzeExpression(e).runA(Map.empty)
+  private def analyze(e: Indexed[cst.Expression[Indexed]]): Either[String, ast.Expression] =
+    analyzeExpression(e).runA(Map.empty)
 
   private def analyze(c: String): Either[String, ast.Expression] =
     analyze(expression.parseAll(c).getOrElse(sys.error("testspec is wrong, cannot parse input")))

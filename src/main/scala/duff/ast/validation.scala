@@ -3,7 +3,7 @@ package ast
 
 import duff.jagsql.ast.*
 import duff.jagsql.ast.ExpressionF.{Binary, FieldRef, FunctionCallExpression, LiteralExpression, Unary}
-import duff.jagsql.cst.Operator
+import duff.jagsql.cst.{Indexed, Operator, Position}
 import duff.jagsql.std.*
 
 import scala.language.experimental
@@ -49,15 +49,15 @@ def filter(expression: ast.Expression, predicate: ExpressionF[Boolean] => Boolea
 }
 
 def analyzeExpression(
-  e: cst.Expression
-): Verified[Fix[ExpressionF]] = e match {
+  e: Indexed[cst.Expression[Indexed]]
+): Verified[Fix[ExpressionF]] = e.value match {
   case cst.Expression.LiteralExpression(l)                    =>
-    val expressionType = getLiteralType(l)
+    val expressionType = getLiteralType(l.value)
 
-    StateT.pure(Fix(ExpressionF.LiteralExpression(l, expressionType)))
+    StateT.pure(Fix(ExpressionF.LiteralExpression(l.value, expressionType)))
   case cst.Expression.FunctionCallExpression(name, arguments) =>
     // TODO: overload resolution
-    val function = Function.valueOf(name)
+    val function = Function.valueOf(name.value)
 
     for {
       analyzedArguments <- arguments.traverse(analyzeExpression(_))
@@ -81,7 +81,7 @@ def analyzeExpression(
           .liftTo[Verified]
     } yield Fix(ExpressionF.FunctionCallExpression(function, analyzedArguments, function.returnType))
 
-  case cst.Expression.Binary(left, right, operator) =>
+  case cst.Expression.Binary(left, right, Indexed(operator, _)) =>
     for {
       leftA      <- analyzeExpression(left)
       rightA     <- analyzeExpression(right)
@@ -111,11 +111,11 @@ def analyzeExpression(
                    }
       r          <- resultType.liftTo[Verified]
     } yield Fix(ExpressionF.Binary(leftA, rightA, operator, r))
-  case cst.Expression.Unary(e)                      =>
+  case cst.Expression.Unary(e)                                  =>
     "not yet implemented".asLeft.liftTo[Verified]
 
   // identifier is only a field identifier for now as CTE are not supported
-  case cst.Expression.IdentifierExpression(identifier) =>
+  case cst.Expression.IdentifierExpression(Indexed(identifier, _)) =>
     def getTable(tableId: String): Verified[ComplexType.Table] =
       for {
         state  <- Verified.read
@@ -154,15 +154,29 @@ def analyzeExpression(
     } yield result
 }
 
+// TODO: this is a bad idea to operate at the CST level because we loose the track of indexes
 // if a from clause is not present, consider we are selecting from STDIN
-def addEmptyStdin(s: cst.Statement.SelectStatement): cst.Statement.SelectStatement =
+def addEmptyStdin(s: cst.Statement.SelectStatement[Indexed]): cst.Statement.SelectStatement[Indexed] =
   s match {
     case cst.Statement.SelectStatement(projections, None, maybeWhere, maybeGroupBy) =>
       cst
         .Statement
         .SelectStatement(
           projections,
-          Some(cst.FromClause(NonEmptyList.one(cst.FromSource(cst.Source.StdIn("in"), None)))),
+          Some(
+            Indexed(
+              cst.FromClause(
+                NonEmptyList
+                  .one(
+                    Indexed(
+                      cst.FromSource(Indexed(cst.Source.StdIn(Indexed("in", Position.empty)), Position.empty), None),
+                      Position.empty
+                    )
+                  )
+              ),
+              Position.empty
+            )
+          ),
           maybeWhere,
           maybeGroupBy
         )
@@ -170,22 +184,22 @@ def addEmptyStdin(s: cst.Statement.SelectStatement): cst.Statement.SelectStateme
   }
 
 def analyzeStatement(
-  i: cst.Statement.SelectStatement
+  i: cst.Statement.SelectStatement[Indexed]
 ): Verified[Statement.SelectStatement] =
   val ss: ComplexType.Table = ComplexType.Table(NonEmptyMap.of("foo" -> SimpleType.Number))
   val s = addEmptyStdin(i)
 
-  def analyzeSource(f: cst.Source): Verified[ast.Source] =
+  def analyzeSource(f: cst.Source[Indexed]): Verified[ast.Source] =
     f match {
       // TODO: there should be no special case here
       // for STDIN, it should be no different from a subquery or a table ref
-      case cst.Source.StdIn(alias)                   =>
+      case cst.Source.StdIn(Indexed(alias, _))                           =>
         for {
           state  <- Verified.read
           source <- Source.StdIn(alias).asRight.liftTo[Verified]
           _      <- Verified.set(state + (alias -> source.tableType))
         } yield source
-      case cst.Source.TableRef(id, alias)            =>
+      case cst.Source.TableRef(Indexed(id, _), Indexed(alias, _))        =>
         for {
           ref    <- Verified.read
           source <- (ref.get(id) match {
@@ -194,13 +208,13 @@ def analyzeStatement(
                     }).liftTo[Verified]
           _      <- Verified.set(ref + (alias -> source.tableType))
         } yield source
-      case cst.Source.SubQuery(statement, alias)     =>
+      case cst.Source.SubQuery(Indexed(statement, _), Indexed(alias, _)) =>
         for {
           s     <- analyzeStatement(statement)
           state <- Verified.read
           _     <- Verified.set(state + (alias -> s.tableType))
         } yield Source.SubQuery(s, alias)
-      case s @ cst.Source.TableFunction(_, _, alias) =>
+      case s @ cst.Source.TableFunction(_, _, Indexed(alias, _))         =>
         for {
           state    <- Verified.read
           function <- validateFunction(s)
@@ -208,26 +222,28 @@ def analyzeStatement(
         } yield function
     }
 
-  def validateFunction(source: cst.Source.TableFunction): Verified[Source] = {
+  def validateFunction(source: cst.Source.TableFunction[Indexed]): Verified[Source] = {
     val fileFunType: ComplexType.Table = ComplexType.Table(NonEmptyMap.of("col_0" -> SimpleType.String))
 
     source match {
-      case cst.Source.TableFunction("FILE", args, alias) if args.map(getLiteralType) == List(Type.String) =>
-        Source.TableFunction("FILE", args, fileFunType).asRight.liftTo[Verified]
+      case cst.Source.TableFunction(Indexed("FILE", _), args, Indexed(alias, _))
+          if args.map(x => getLiteralType(x.value)) == List(Type.String) =>
+        Source.TableFunction("FILE", args.map(_.value), fileFunType).asRight.liftTo[Verified]
       case _ => s"Unknown table function ${source.name} with supplied arguments".asLeft.liftTo[Verified]
     }
 
   }
 
-  def analyzeFromSource(fromItem: cst.FromSource): Verified[ast.FromSource] =
+  def analyzeFromSource(fromItem: Indexed[cst.FromSource[Indexed]]): Verified[ast.FromSource] =
     for {
-      analyzedSource          <- analyzeSource(fromItem.source)
+      analyzedSource          <- analyzeSource(fromItem.value.source.value)
       maybeAnalyzedExpression <- fromItem
+                                   .value
                                    .maybeJoinPredicates
                                    .traverse(analyzeExpression(_))
     } yield FromSource(analyzedSource, maybeAnalyzedExpression)
 
-  def analyzeFromClause(f: cst.FromClause): Verified[ast.FromClause] =
+  def analyzeFromClause(f: cst.FromClause[Indexed]): Verified[ast.FromClause] =
     for {
       analyzedItems <-
         f.items
@@ -316,13 +332,14 @@ def analyzeStatement(
         // TODO: if FROM expansion appears at analysis, there is duplicate code
         // happening here
         analyzedFrom         <- from match {
-                                  case None    => sys.error("should not happen, from clause has already been substituted")
-                                  case Some(f) => analyzeFromClause(f)
+                                  case None => sys.error("should not happen, from clause has already been substituted")
+                                  case Some(Indexed(f, _)) => analyzeFromClause(f)
                                 }
         maybeAnalyzedGroupBy <-
           maybeGroupBy
             .traverse { case groupBy =>
               groupBy
+                .value
                 .expressions
                 .traverse(analyzeExpression)
                 // need to check the expressions are aggregate function free
@@ -330,8 +347,8 @@ def analyzeStatement(
                 .map(GroupByClause.apply)
 
             }
-        analyzedProjections  <- projections.traverse { case cst.Projection(expression, alias) =>
-                                  analyzeExpression(expression).map(e => Projection(e, alias))
+        analyzedProjections  <- projections.traverse { case Indexed(cst.Projection(expression, alias), _) =>
+                                  analyzeExpression(expression).map(e => Projection(e, alias.map(_.value)))
                                 }
         _                    <- maybeAnalyzedGroupBy
                                   .flatMap { g =>
@@ -358,11 +375,12 @@ def analyzeStatement(
                                   }
                                   .toLeft(())
                                   .liftTo[Verified]
-        analyzedWhere <- maybeWhere.traverse(where => analyzeExpression(where.expression).map(k => WhereClause(k)))
+        analyzedWhere        <-
+          maybeWhere.traverse(where => analyzeExpression(where.value.expression).map(k => WhereClause(k)))
         maybeAnalyzedGroupBy <-
           maybeGroupBy
             .traverse { case groupBy =>
-              groupBy.expressions.traverse(analyzeExpression).map(GroupByClause.apply)
+              groupBy.value.expressions.traverse(analyzeExpression).map(GroupByClause.apply)
             }
         types = analyzedProjections
                   .zipWithIndex

@@ -1,6 +1,7 @@
 package duff.jagsql
 package ast
 
+import duff.jagsql.cst.Indexed
 import duff.jagsql.parser.selectStatement
 import duff.jagsql.std.*
 
@@ -98,29 +99,28 @@ class StatementAnalysisSpec extends StatementAnalysisDsl:
 
 trait StatementAnalysisDsl extends AnyFreeSpec with Matchers:
 
-  def analyze(e: cst.Statement.SelectStatement): Either[String, ast.Statement.SelectStatement] =
+  def analyze(e: cst.Statement.SelectStatement[Indexed]): Either[String, ast.Statement.SelectStatement] =
     analyzeStatement(e).runA(Map.empty)
 
   def analyze(c: String): Either[String, ast.Statement.SelectStatement] =
     analyze(
       selectStatement
-        .parseAll(c)
-        .map(_.asInstanceOf[cst.Statement.SelectStatement]) match {
+        .parseAll(c) match {
         case Left(error)   => sys.error(s"testspec is wrong, cannot parse input, $error")
-        case Right(result) => result
+        case Right(result) => result.value
       }
     )
 
-  extension (c: cst.Statement.SelectStatement)
-
-    def analyzesTo(expected: ast.Expression): Unit =
-      c.toString in {
-        analyze(c) match {
-          case Left(error)   => fail(error)
-          case Right(result) => assert(result == expected)
-        }
-      }
-
+//  extension[F[_]] (c: cst.Statement.SelectStatement[F])
+//
+//    def analyzesTo(expected: ast.Expression): Unit =
+//      c.toString in {
+//        analyze(c) match {
+//          case Left(error)   => fail(error)
+//          case Right(result) => assert(result == expected)
+//        }
+//      }
+//
   extension (c: String) {
 
     def analyzesTo(expected: ast.Statement.SelectStatement): Unit = {

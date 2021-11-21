@@ -1,7 +1,7 @@
 package duff.jagsql
 package ast
 
-import duff.jagsql.cst.{Expression, Literal}
+import duff.jagsql.cst.{Expression, Indexed, Literal, Position}
 import duff.jagsql.parser.expression
 import duff.jagsql.std.*
 
@@ -16,16 +16,18 @@ import org.scalatest.matchers.should.Matchers
 class ExpressionAnalysisSpec extends AnalysisDsl:
 
   val one = Literal.NumberLiteral(BigDecimal(1))
+  val oneIndexed = Indexed(Literal.NumberLiteral(BigDecimal(1)), Position.empty)
   val someString = Literal.StringLiteral("someString")
+  val someStringIndexed = Indexed(Literal.StringLiteral("someString"), Position.empty)
 
-  Expression.LiteralExpression(one) analyzesTo
+  Expression.LiteralExpression[Indexed](oneIndexed) analyzesTo
     Fix(
       ast
         .ExpressionF
         .LiteralExpression(one, ast.Type.Number)
     )
 
-  Expression.LiteralExpression(someString) analyzesTo
+  Expression.LiteralExpression[Indexed](someStringIndexed) analyzesTo
     Fix(
       ast
         .ExpressionF
@@ -107,15 +109,16 @@ class ExpressionAnalysisSpec extends AnalysisDsl:
 
 trait AnalysisDsl extends AnyFreeSpec with Matchers:
 
-  def analyze(e: cst.Expression): Either[String, ast.Expression] = analyzeExpression(e).runA(Map.empty)
+  def analyze(e: Indexed[cst.Expression[Indexed]]): Either[String, ast.Expression] =
+    analyzeExpression(e).runA(Map.empty)
   def analyze(c: String): Either[String, ast.Expression] =
     analyze(expression.parseAll(c).getOrElse(sys.error("testspec is wrong, cannot parse input")))
 
-  extension (c: cst.Expression)
+  extension (c: cst.Expression[Indexed])
 
     def analyzesTo(expected: ast.Expression): Unit =
       c.toString in {
-        analyze(c) match {
+        analyze(Indexed(c, Position.empty)) match {
           case Left(error)   => fail(error)
           case Right(result) => assert(result == expected)
         }
