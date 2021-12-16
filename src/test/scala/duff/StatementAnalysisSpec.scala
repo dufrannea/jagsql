@@ -1,6 +1,7 @@
 package duff.jagsql
 package ast
 
+import duff.jagsql.ast.validation.*
 import duff.jagsql.cst.Indexed
 import duff.jagsql.parser.selectStatement
 import duff.jagsql.std.*

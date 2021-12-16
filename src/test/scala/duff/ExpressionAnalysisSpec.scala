@@ -1,6 +1,7 @@
 package duff.jagsql
 package ast
 
+import duff.jagsql.ast.validation.*
 import duff.jagsql.cst.{Expression, Indexed, Literal, Position}
 import duff.jagsql.parser.expression
 import duff.jagsql.std.*

@@ -1,6 +1,7 @@
 package duff.jagsql
 package runner
 
+import duff.jagsql.ast.validation.*
 import duff.jagsql.eval.*
 
 import java.nio.charset.StandardCharsets
@@ -57,7 +58,7 @@ trait RunnerDsl extends AnyFreeSpec with Matchers {
   import cats.effect.unsafe.implicits.global
 
   private def evaluate(query: String, stdIn: Stream[IO, String]): IO[Vector[Row]] = {
-    import ast.{Scope, analyzeStatement}
+    import ast.validation.{Scope, analyzeStatement}
     import cats.data.State
     import parser.parse
     import planner.toStage

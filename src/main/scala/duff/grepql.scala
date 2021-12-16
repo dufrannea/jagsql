@@ -1,6 +1,6 @@
 package duff.jagsql
 
-import duff.jagsql.ast.{analyzeStatement, Scope}
+import duff.jagsql.ast.validation.{analyzeStatement, Scope}
 import duff.jagsql.cst.Indexed
 import duff.jagsql.parser.parse
 import duff.jagsql.planner.toStage
