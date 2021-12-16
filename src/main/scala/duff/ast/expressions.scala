@@ -64,15 +64,35 @@ enum ExpressionF[K] {
 
 object ExpressionF {
 
-  given Functor[ExpressionF] with
+  given Traverse[ExpressionF] with
 
-    def map[A, B](fa: ExpressionF[A])(f: A => B): ExpressionF[B] = fa match {
-      case FunctionCallExpression(name, args, t) => FunctionCallExpression(name, args.map(f), t)
-      case Binary(left, right, operator, t)      => Binary(f(left), f(right), operator, t)
-      case Unary(e, t)                           => Unary(f(e), t)
-      case LiteralExpression(literal, t)         => LiteralExpression(literal, t)
-      case FieldRef(tableId, fieldId, t)         => FieldRef(tableId, fieldId, t)
-    }
+    def foldLeft[a, b](fa: ExpressionF[a], b: b)(f: (b, a) => b): b =
+      fa match {
+        case FunctionCallExpression(name, args, t) => args.foldLeft(b)(f)
+        case Binary(left, right, operator, t)      => f(f(b, left), right)
+        case Unary(e, t)                           => f(b, e)
+        case LiteralExpression(literal, t)         => b
+        case FieldRef(tableId, fieldId, t)         => b
+      }
+
+    def foldRight[a, b](fa: ExpressionF[a], lb: cats.Eval[b])(f: (a, cats.Eval[b]) => cats.Eval[b]): cats.Eval[b] =
+      fa match {
+        case FunctionCallExpression(name, args, t) => args.foldRight(lb)(f)
+        case Binary(left, right, operator, t)      => f(right, f(left, lb))
+        case Unary(e, t)                           => f(e, lb)
+        case LiteralExpression(literal, t)         => lb
+        case FieldRef(tableId, fieldId, t)         => lb
+      }
+
+    def traverse[G[_]: Applicative, A, B](fa: ExpressionF[A])(f: A => G[B]): G[ExpressionF[B]] =
+      fa match {
+        case FunctionCallExpression(name, args, t) => args.traverse(f).map(a => FunctionCallExpression(name, a, t))
+        case Binary(left, right, operator, t)      =>
+          (f(left), f(right)).mapN { case (l, r) => Binary(l, r, operator, t) }
+        case Unary(e, t)                           => f(e).map(Unary(_, t))
+        case LiteralExpression(literal, t)         => LiteralExpression(literal, t).pure[G]
+        case FieldRef(tableId, fieldId, t)         => FieldRef(tableId, fieldId, t).pure[G]
+      }
 
   extension (e: Expression) {
     def exists(p: ExpressionF[_] => Boolean) = cata(existsAlg(p))(e)
