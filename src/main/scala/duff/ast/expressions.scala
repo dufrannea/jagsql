@@ -2,7 +2,7 @@ package duff.jagsql
 package ast
 
 import duff.jagsql.ast.ExpressionF.{Binary, FieldRef, FunctionCallExpression, LiteralExpression, Unary}
-import duff.jagsql.cst.Operator
+import duff.jagsql.cst.{Indexed, Operator, Position}
 import duff.jagsql.std.*
 
 import scala.language.experimental
@@ -114,3 +114,9 @@ def existsAlg(p: ExpressionF[_] => Boolean)(a: ExpressionF[Boolean]): Boolean = 
 }
 
 type Expression = Fix[ExpressionF]
+
+case class Labeled[F[_]: Functor](unlabel: F[Labeled[F]], a: Position) {
+  def fix: Fix[F] = Fix(unlabel.map(_.fix))
+}
+
+type IndexedExpression = Labeled[ExpressionF]

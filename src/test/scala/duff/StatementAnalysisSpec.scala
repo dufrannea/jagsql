@@ -45,7 +45,12 @@ class StatementAnalysisSpec extends StatementAnalysisDsl:
 
   "SELECT foo.bar FROM (SELECT 1 AS bar) AS foo JOIN (SELECT 2 AS bar) AS baz ON foo.bar = baz.bar" succeeds
 
-  "SELECT foo.bazzzz FROM (SELECT 1 AS bar) AS foo" fails
+  "SELECT foo.bazzzz FROM (SELECT 1 AS bar) AS foo" failsWith {
+    """ERROR: Non existing field bazzzz on table foo
+      |
+      |SELECT foo.bazzzz FROM (SELECT 1 AS bar) AS foo
+      |       ^^^^^^^^^^""".stripMargin
+  }
 
   "SELECT foo.col_0 FROM STDIN AS foo GROUP BY foo.col_0" succeeds
 
@@ -71,7 +76,12 @@ class StatementAnalysisSpec extends StatementAnalysisDsl:
 
     "SELECT 1 FROM (SELECT 1 AS bar, 2 AS baz) AS foo GROUP BY foo.bar, array(foo.bar)" succeeds
 
-    "SELECT 1 FROM (SELECT 1 AS bar, 2 AS baz) AS foo GROUP BY foo.bar, array(max(foo.bar))" fails
+    "SELECT 1 FROM (SELECT 1 AS bar, 2 AS baz) AS foo GROUP BY foo.bar, array(max(foo.bar))" failsWith {
+      """ERROR: Expressions in GROUP BY clause should not contain aggregation functions
+        |
+        |SELECT 1 FROM (SELECT 1 AS bar, 2 AS baz) AS foo GROUP BY foo.bar, array(max(foo.bar))
+        |                                                                         ^^^^^^^^^^^^""".stripMargin
+    }
 
     """|SELECT
        |  1 AS one
@@ -88,7 +98,14 @@ class StatementAnalysisSpec extends StatementAnalysisDsl:
        |  a.d AS one
        |FROM
        |  (SELECT 1 AS b, 1 AS d, 1 AS c) AS a
-       |GROUP BY a.d - 1""".stripMargin fails
+       |GROUP BY a.d - 1""".stripMargin failsWith {
+      """ERROR: Expression is not included in GROUP BY
+        |
+        |SELECT
+        |         
+        |  a.d AS one
+        |  ^^^""".stripMargin
+    }
 
     """|SELECT
        |  a.d - 1 AS one
@@ -99,10 +116,10 @@ class StatementAnalysisSpec extends StatementAnalysisDsl:
 
 trait StatementAnalysisDsl extends AnyFreeSpec with Matchers:
 
-  def analyze(e: cst.Statement.SelectStatement[Indexed]): Either[String, ast.Statement.SelectStatement] =
+  def analyze(e: cst.Statement.SelectStatement[Indexed]): Either[TrackedError, ast.Statement.SelectStatement] =
     analyzeStatement(e).runA(Map.empty)
 
-  def analyze(c: String): Either[String, ast.Statement.SelectStatement] =
+  def analyze(c: String): Either[TrackedError, ast.Statement.SelectStatement] =
     analyze(
       selectStatement
         .parseAll(c) match {
@@ -111,49 +128,49 @@ trait StatementAnalysisDsl extends AnyFreeSpec with Matchers:
       }
     )
 
-//  extension[F[_]] (c: cst.Statement.SelectStatement[F])
-//
-//    def analyzesTo(expected: ast.Expression): Unit =
-//      c.toString in {
-//        analyze(c) match {
-//          case Left(error)   => fail(error)
-//          case Right(result) => assert(result == expected)
-//        }
-//      }
-//
   extension (c: String) {
 
     def analyzesTo(expected: ast.Statement.SelectStatement): Unit = {
       import ast.*
 
-      c.toString in {
+      c in {
         analyze(c) match {
-          case Left(error)   => fail(error)
+          case Left(error)   => fail(error.format(c))
           case Right(result) => assert(result == expected)
         }
       }
     }
 
     def hasType(expected: ast.Type): Unit =
-      c.toString in {
+      c in {
         analyze(c) match {
-          case Left(error)      => fail(error)
+          case Left(error)      => fail(error.format(c))
           case Right(statement) => assert(statement.tableType == expected)
         }
       }
 
     def succeeds: Unit =
-      c.toString in {
+      c in {
         analyze(c) match {
-          case Left(e)       => fail(e)
+          case Left(e)       => fail(e.format(c))
           case Right(result) => succeed
         }
       }
 
     def fails: Unit =
-      c.toString in {
+      c in {
         analyze(c) match {
-          case Left(e)       => succeed
+          case Left(_)       => succeed
+          case Right(result) => fail("expected error")
+        }
+      }
+
+    def failsWith(s: String): Unit =
+      c in {
+        analyze(c) match {
+          case Left(e)       =>
+            val formattedError = e.format(c)
+            assert(formattedError == s)
           case Right(result) => fail("expected error")
         }
       }

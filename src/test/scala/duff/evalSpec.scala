@@ -32,13 +32,13 @@ class evalSpec extends EvalDsl:
 
 trait EvalDsl extends AnyFreeSpec with Matchers:
 
-  private def analyze(e: Indexed[cst.Expression[Indexed]]): Either[String, ast.Expression] =
-    analyzeExpression(e).runA(Map.empty)
+  private def analyze(e: Indexed[cst.Expression[Indexed]]): Either[TrackedError, ast.Expression] =
+    analyzeExpression(e).runA(Map.empty).map(_.fix)
 
-  private def analyze(c: String): Either[String, ast.Expression] =
+  private def analyze(c: String): Either[TrackedError, ast.Expression] =
     analyze(expression.parseAll(c).getOrElse(sys.error("testspec is wrong, cannot parse input")))
 
-  def evaluate(c: String): Either[String, Value] =
+  def evaluate(c: String): Either[TrackedError, Value] =
     for {
       analyzed  <- analyze(c)
       evaluated <- eval(analyzed).asRight
@@ -49,24 +49,24 @@ trait EvalDsl extends AnyFreeSpec with Matchers:
     def evaluatesTo(expected: Value): Unit = {
       import ast.*
 
-      c.toString in {
+      c in {
         evaluate(c) match {
-          case Left(error)   => fail(error)
+          case Left(error)   => fail(error.toString)
           case Right(result) => assert(result == expected)
         }
       }
     }
 
-    def succeeds: Unit =
-      c.toString in {
+    def succeeds(): Unit =
+      c in {
         evaluate(c) match {
-          case Left(e)  => fail(e)
+          case Left(e)  => fail(e.toString)
           case Right(_) => succeed
         }
       }
 
-    def fails: Unit =
-      c.toString in {
+    def fails(): Unit =
+      c in {
         evaluate(c) match {
           case Left(_)  => succeed
           case Right(_) => fail("expected error")

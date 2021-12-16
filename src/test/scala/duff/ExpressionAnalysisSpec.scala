@@ -109,9 +109,9 @@ class ExpressionAnalysisSpec extends AnalysisDsl:
 
 trait AnalysisDsl extends AnyFreeSpec with Matchers:
 
-  def analyze(e: Indexed[cst.Expression[Indexed]]): Either[String, ast.Expression] =
-    analyzeExpression(e).runA(Map.empty)
-  def analyze(c: String): Either[String, ast.Expression] =
+  def analyze(e: Indexed[cst.Expression[Indexed]]): Either[TrackedError, ast.Expression] =
+    analyzeExpression(e).runA(Map.empty).map(_.fix)
+  def analyze(c: String): Either[TrackedError, ast.Expression] =
     analyze(expression.parseAll(c).getOrElse(sys.error("testspec is wrong, cannot parse input")))
 
   extension (c: cst.Expression[Indexed])
@@ -119,7 +119,7 @@ trait AnalysisDsl extends AnyFreeSpec with Matchers:
     def analyzesTo(expected: ast.Expression): Unit =
       c.toString in {
         analyze(Indexed(c, Position.empty)) match {
-          case Left(error)   => fail(error)
+          case Left(error)   => fail(error.toString)
           case Right(result) => assert(result == expected)
         }
       }
@@ -129,32 +129,32 @@ trait AnalysisDsl extends AnyFreeSpec with Matchers:
     def analyzesTo(expected: ast.Expression): Unit = {
       import ast.*
 
-      c.toString in {
+      c in {
         analyze(c) match {
-          case Left(error)   => fail(error)
+          case Left(error)   => fail(error.format(c))
           case Right(result) => assert(result == expected)
         }
       }
     }
 
     def hasType(expected: ast.Type): Unit =
-      c.toString in {
+      c in {
         analyze(c) match {
-          case Left(error)   => fail(error)
+          case Left(error)   => fail(error.format(c))
           case Right(Fix(r)) => assert(r.expressionType == expected)
         }
       }
 
     def succeeds: Unit =
-      c.toString in {
+      c in {
         analyze(c) match {
-          case Left(e)       => fail(e)
+          case Left(e)       => fail(e.format(c))
           case Right(result) => succeed
         }
       }
 
     def fails: Unit =
-      c.toString in {
+      c in {
         analyze(c) match {
           case Left(e)       => succeed
           case Right(result) => fail("expected error")

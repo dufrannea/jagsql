@@ -266,9 +266,10 @@ object parser {
   }
 
   val projection: IndexedParser[Projection[Indexed]] =
-    (expression ~ (keyword("AS") *> w *> compositeIdentifier <* w.?).?).map { case (e, maybeAlias) =>
-      Projection(e, maybeAlias)
-    }.indexed
+    ((expression ~ (keyword("AS") *> w *> compositeIdentifier).?).indexed <* w.?).map {
+      case Indexed((e, maybeAlias), pos) =>
+        Indexed(Projection(e, maybeAlias), pos)
+    }
 
   val whereClause = (WHERE *> w *> expression).map(e => WhereClause(e)).indexed
 

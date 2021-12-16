@@ -38,7 +38,7 @@ object Main extends IOApp {
     val stream = for {
       parsed   <- parse(query)
       _ = println("parsing ok")
-      analyzed <- analyzeStatement(parsed).runA(Map.empty).leftMap(new Throwable(_))
+      analyzed <- analyzeStatement(parsed).runA(Map.empty).leftMap(k => new Throwable(k.toString))
       _ = println("analysis ok")
       rootStage = toStage(analyzed)
       _ = println("planning ok")

@@ -16,11 +16,11 @@ import cats.implicits.*
 type Scope = Map[String, ComplexType.Table]
 
 // This type is isomorphic to
-// Either[String, State[Scope, K]]
+// Either[TrackedError, State[Scope, K]]
 //
 // The State is used to remember previously seen
 // table and columns resolutions
-type Verified[K] = StateT[[A] =>> Either[String, A], Scope, K]
+type Verified[K] = StateT[[A] =>> Either[TrackedError, A], Scope, K]
 
 object Verified {
   def read: Verified[Map[String, ComplexType.Table]] = StateT.get
@@ -29,7 +29,61 @@ object Verified {
 
   def pure[K](k: K): Verified[K] = StateT.pure(k)
 
-  def error(s: String): Verified[Nothing] = s.asLeft.liftTo[Verified]
+  def error(s: String)(p: Position): Verified[Nothing] = TrackedError(p, s).asLeft.liftTo[Verified]
+}
+
+case class TrackedError(index: Position, message: String) {
+
+  private def underline(sql: String, index: Position, message: String) = {
+    val lineIndexes: Vector[(Int, Int)] = sql
+      .linesIterator
+      .foldLeft((0, List.empty[(Int, Int)])) { case ((from, p), current) =>
+        val nextIndex = from + current.length + 1
+        (nextIndex, (from -> (current.length + 1)) :: p)
+      }
+      ._2
+      .reverse
+      .toVector
+
+    val firstIndex = lineIndexes
+      .zipWithIndex
+      .collectFirst { case (k, i) if k._1 <= index.from => i }
+      .getOrElse(0)
+
+    val lastIndex = lineIndexes
+      .zipWithIndex
+      .collectFirst { case (k, i) if (k._1 + k._2) >= index.to => i }
+      .getOrElse(lineIndexes.length)
+
+    val formattedError = (firstIndex to lastIndex).map { k =>
+      val (startIndex, length) = lineIndexes(k)
+
+      val padding =
+        if (index.from >= startIndex)
+          index.from - startIndex
+        else 0
+
+      val len =
+        if (index.to <= startIndex + length)
+          index.to - padding - startIndex
+        else
+          Math.max(length - padding - 1, 0)
+
+      val line = sql.substring(startIndex, Math.max(0, startIndex + length - 1))
+      val underlined = (0 until padding).map(_ => " ").mkString + (0 until len).map(_ => "^").mkString
+
+      line + "\n" + underlined
+    }
+
+    s"""ERROR: $message
+       |
+       |${formattedError.mkString("\n")}""".stripMargin
+
+  }
+
+  def format(sql: String) =
+    underline(sql, index, message)
+
 }
 
 def getLiteralType(l: cst.Literal) =
@@ -50,11 +104,11 @@ def filter(expression: ast.Expression, predicate: ExpressionF[Boolean] => Boolea
 
 def analyzeExpression(
   e: Indexed[cst.Expression[Indexed]]
-): Verified[Fix[ExpressionF]] = e.value match {
+): Verified[ast.IndexedExpression] = e.value match {
   case cst.Expression.LiteralExpression(l)                    =>
     val expressionType = getLiteralType(l.value)
 
-    StateT.pure(Fix(ExpressionF.LiteralExpression(l.value, expressionType)))
+    StateT.pure(Labeled(ExpressionF.LiteralExpression(l.value, expressionType), e.pos))
   case cst.Expression.FunctionCallExpression(name, arguments) =>
     // TODO: overload resolution
     val function = Function.valueOf(name.value)
@@ -71,26 +125,34 @@ def analyzeExpression(
           .toList
       _                 <-
         zippedArgsWithExpectedTypes
-          .foldM(()) { case (_, (expectedArgType, Fix(analyzedExpression))) =>
+          .foldM(()) { case (_, (expectedArgType, Labeled(analyzedExpression, _))) =>
             analyzedExpression.expressionType match {
               case `expectedArgType` => Either.unit
               case _                 =>
-                s"Error in function $name, argument with type ${analyzedExpression.expressionType} expected to have type $expectedArgType".asLeft
+                TrackedError(
+                  e.pos,
+                  s"Error in function $name, argument with type ${analyzedExpression.expressionType}" +
+                    " expected to have type $expectedArgType"
+                ).asLeft
             }
           }
+          .map(Indexed(_, e.pos))
           .liftTo[Verified]
-    } yield Fix(ExpressionF.FunctionCallExpression(function, analyzedArguments, function.returnType))
+    } yield Labeled(ExpressionF.FunctionCallExpression(function, analyzedArguments, function.returnType), e.pos)
 
-  case cst.Expression.Binary(left, right, Indexed(operator, _)) =>
+  case cst.Expression.Binary(left, right, Indexed(operator, operatorPos)) =>
     for {
       leftA      <- analyzeExpression(left)
       rightA     <- analyzeExpression(right)
-      leftType = leftA.unfix.expressionType
-      rightType = rightA.unfix.expressionType
+      leftType = leftA.unlabel.expressionType
+      rightType = rightA.unlabel.expressionType
       commonType <- {
-        if (leftType == rightType) leftA.unfix.expressionType.asRight
+        if (leftType == rightType) leftA.unlabel.expressionType.asRight
         else
-          s"Types on the LHS and RHS should be the same for operator ${operator.toString}, here found ${leftType.toString} and ${rightType.toString}".asLeft
+          TrackedError(
+            e.pos,
+            s"Types on the LHS and RHS should be the same for operator ${operator.toString}, here found ${leftType.toString} and ${rightType.toString}"
+          ).asLeft
       }.liftTo[Verified]
       resultType = (commonType, operator) match {
                      // Equality is valid for every type
@@ -107,15 +169,20 @@ def analyzeExpression(
                      // Only string operator is concatenation
                      case (Type.String, Operator.Plus)                            => Either.right(Type.String)
                      case (Type.Bool, o) if o == Operator.And || o == Operator.Or => Either.right(Type.Bool)
-                     case _ => s"Operator ${operator.toString} cannot be used with type ${leftType.toString}".asLeft
+                     case _                                                       =>
+                       TrackedError(
+                         operatorPos,
+                         s"Operator ${operator.toString} cannot be used with type ${leftType.toString}"
+                       ).asLeft
                    }
       r          <- resultType.liftTo[Verified]
-    } yield Fix(ExpressionF.Binary(leftA, rightA, operator, r))
-  case cst.Expression.Unary(e)                                  =>
-    "not yet implemented".asLeft.liftTo[Verified]
+
+    } yield Labeled(ast.ExpressionF.Binary(leftA, rightA, operator, r), e.pos)
+  case cst.Expression.Unary(e)                                            =>
+    TrackedError(e.pos, "not yet implemented").asLeft.liftTo[Verified]
 
   // identifier is only a field identifier for now as CTE are not supported
-  case cst.Expression.IdentifierExpression(Indexed(identifier, _)) =>
+  case cst.Expression.IdentifierExpression(iid @ Indexed(identifier, _)) =>
     def getTable(tableId: String): Verified[ComplexType.Table] =
       for {
         state  <- Verified.read
@@ -123,7 +190,7 @@ def analyzeExpression(
         foundTableType = state.get(tableId) match {
                            case Some(tableType) =>
                              tableType.asRight
-                           case None            => s"Table not found $tableId".asLeft
+                           case None            => TrackedError(iid.pos, s"Table not found $tableId").asLeft
                          }
         result <- foundTableType.liftTo[Verified]
       } yield result
@@ -135,9 +202,12 @@ def analyzeExpression(
                   case tableId :: fieldId :: Nil =>
                     getTable(tableId).flatMap { tableType =>
                       tableType.cols(fieldId) match {
-                        case None            => s"Non existing field $fieldId on table $tableId".asLeft.liftTo[Verified]
+                        case None            =>
+                          TrackedError(iid.pos, s"Non existing field $fieldId on table $tableId")
+                            .asLeft
+                            .liftTo[Verified]
                         case Some(fieldType) =>
-                          Fix(ExpressionF.FieldRef(tableId, fieldId, fieldType)).asRight.liftTo[Verified]
+                          (Labeled(ExpressionF.FieldRef(tableId, fieldId, fieldType), e.pos)).asRight.liftTo[Verified]
                       }
                     }
                   case _                         =>
@@ -149,7 +219,7 @@ def analyzeExpression(
                     //
                     // This does not:
                     // "lol".asLeft.liftTo[Verified]
-                    Verified.error(s"only a.b identifier are supported, found $identifier")
+                    Verified.error(s"only a.b identifier are supported, found $identifier")(iid.pos)
                 }
     } yield result
 }
@@ -199,12 +269,12 @@ def analyzeStatement(
           source <- Source.StdIn(alias).asRight.liftTo[Verified]
           _      <- Verified.set(state + (alias -> source.tableType))
         } yield source
-      case cst.Source.TableRef(Indexed(id, _), Indexed(alias, _))        =>
+      case cst.Source.TableRef(Indexed(id, tablePos), Indexed(alias, _)) =>
         for {
           ref    <- Verified.read
           source <- (ref.get(id) match {
                       case Some(tableType) => Source.TableRef(id, tableType).asRight
-                      case None            => s"table not found $id".asLeft
+                      case None            => TrackedError(tablePos, s"table not found $id").asLeft
                     }).liftTo[Verified]
           _      <- Verified.set(ref + (alias -> source.tableType))
         } yield source
@@ -229,7 +299,10 @@ def analyzeStatement(
       case cst.Source.TableFunction(Indexed("FILE", _), args, Indexed(alias, _))
           if args.map(x => getLiteralType(x.value)) == List(Type.String) =>
         Source.TableFunction("FILE", args.map(_.value), fileFunType).asRight.liftTo[Verified]
-      case _ => s"Unknown table function ${source.name} with supplied arguments".asLeft.liftTo[Verified]
+      case _ =>
+        TrackedError(source.name.pos, s"Unknown table function ${source.name} with supplied arguments")
+          .asLeft
+          .liftTo[Verified]
     }
 
   }
@@ -240,8 +313,8 @@ def analyzeStatement(
       maybeAnalyzedExpression <- fromItem
                                    .value
                                    .maybeJoinPredicates
-                                   .traverse(analyzeExpression(_))
-    } yield FromSource(analyzedSource, maybeAnalyzedExpression)
+                                   .traverse(analyzeExpression _)
+    } yield FromSource(analyzedSource, maybeAnalyzedExpression.map(_.fix))
 
   def analyzeFromClause(f: cst.FromClause[Indexed]): Verified[ast.FromClause] =
     for {
@@ -257,30 +330,42 @@ def analyzeStatement(
     }
 
   // aggregate function not containing other aggregate functions
-  def isOneLevelAggregateFunction(e: ast.Expression): Boolean =
-    e.unfix match {
+  def isOneLevelAggregateFunction(e: ast.IndexedExpression): Boolean =
+    e.unlabel match {
       case ast.ExpressionF.FunctionCallExpression(f: AggregateFunction, arguments, _) =>
-        !arguments.exists(containAggregateFunction)
+        arguments.collectFirst(containAggregateFunction(_)).isEmpty
       case _                                                                          => false
     }
 
-  def containAggregateFunction(e: ast.Expression): Boolean =
-    e.exists {
-      case ast.ExpressionF.FunctionCallExpression(f: AggregateFunction, _, _) => true
-      case _                                                                  => false
+  def containAggregateFunction_(e: ast.IndexedExpression): Either[ast.IndexedExpression, Unit] =
+    e.unlabel match {
+      case ast.ExpressionF.FunctionCallExpression(f: AggregateFunction, _, _) =>
+        Either.left(e)
+      // TODO: it is suboptimal because there is no early exit
+      case _                                                                  =>
+        e
+          .unlabel
+          .traverse(k => containAggregateFunction_(k))
+          .as(())
     }
 
+  def containAggregateFunction(e: ast.IndexedExpression): Option[ast.IndexedExpression] =
+    containAggregateFunction_(e).left.toOption
+
   def checkDoNotContainAggregateFunctions(
-    expressions: NonEmptyList[ast.Expression]
+    expressions: NonEmptyList[ast.IndexedExpression]
   ): Verified[NonEmptyList[ast.Expression]] = {
+    val maybeInvalidExpression: Option[ast.IndexedExpression] =
+      expressions.collectFirstSome(e => containAggregateFunction(e))
 
-    val isInvalid = expressions.exists(containAggregateFunction)
-
-    if (isInvalid)
-      "Expressions in GROUP BY clause should not contain aggregation functions".asLeft.liftTo[Verified]
-    else
-      expressions.asRight.liftTo[Verified]
-
+    maybeInvalidExpression match {
+      case Some(expression) =>
+        TrackedError(expression.a, "Expressions in GROUP BY clause should not contain aggregation functions")
+          .asLeft
+          .liftTo[Verified]
+      case _                =>
+        expressions.map(_.fix).asRight.liftTo[Verified]
+    }
   }
 
   def containsOnlyStaticOrGroupedByExpressions(
@@ -294,15 +379,15 @@ def analyzeStatement(
     *   - non aggregates are okay only if composing grouped by expressions
     */
   def isValidWithRespectToGroupBy(
-    e: ast.Expression,
+    e: ast.IndexedExpression,
     groupByExpressions: Set[ast.Expression]
-  ): Either[String, List[ast.Expression]] =
-    if (groupByExpressions.contains(e)) {
+  ): Either[String, List[ast.IndexedExpression]] =
+    if (groupByExpressions.contains(e.fix)) {
       Right(e :: Nil)
     } else {
-      e.unfix match {
+      e.unlabel match {
         case FunctionCallExpression(func: AggregateFunction, args, t) =>
-          val invalid = args.filter(containAggregateFunction)
+          val invalid = args.collectFirstSome(containAggregateFunction)
           if (invalid.nonEmpty)
             Left(s"Cannot nest aggregate functions in ${invalid}")
           else
@@ -322,7 +407,7 @@ def analyzeStatement(
           Right(Nil)
         case Unary(e, t)                                              => sys.error("Not supported")
         case _                                                        =>
-          Left(s"Not in GROUP BY: $e")
+          Left(s"Expression is not included in GROUP BY")
       }
     }
 
@@ -347,18 +432,25 @@ def analyzeStatement(
                 .map(GroupByClause.apply)
 
             }
-        analyzedProjections  <- projections.traverse { case Indexed(cst.Projection(expression, alias), _) =>
-                                  analyzeExpression(expression).map(e => Projection(e, alias.map(_.value)))
-                                }
+        analyzedProjections  <- projections
+                                  .traverse { case Indexed(cst.Projection(expression, alias), p) =>
+                                    analyzeExpression(expression).map(_ -> (alias, p))
+                                  }
+                                  .map { expressions =>
+                                    expressions.map { case (e, (alias, p)) =>
+                                      Indexed(Projection(e.fix, alias.map(_.value)), p) -> e
+                                    }
+                                  }
         _                    <- maybeAnalyzedGroupBy
                                   .flatMap { g =>
                                     val allowedExpressions = g.expressions.toList.toSet
 
-                                    // val e: Either[String, List[Expression]] =
-                                    analyzedProjections.foldMap(k => isValidWithRespectToGroupBy(k.e, allowedExpressions)) match {
+                                    analyzedProjections.foldMap { case (projection, expression) =>
+                                      isValidWithRespectToGroupBy(expression, allowedExpressions)
+                                        .leftMap(error => TrackedError(expression.a, error))
+                                    } match {
                                       case Left(error)     => Some(error)
                                       case Right(datasets) => None
-
                                     }
 
                                   // val errors = analyzedProjections.collect {
@@ -376,17 +468,18 @@ def analyzeStatement(
                                   .toLeft(())
                                   .liftTo[Verified]
         analyzedWhere        <-
-          maybeWhere.traverse(where => analyzeExpression(where.value.expression).map(k => WhereClause(k)))
+          maybeWhere.traverse(where => analyzeExpression(where.value.expression).map(k => WhereClause(k.fix)))
         maybeAnalyzedGroupBy <-
           maybeGroupBy
             .traverse { case groupBy =>
-              groupBy.value.expressions.traverse(analyzeExpression).map(GroupByClause.apply)
+              groupBy.value.expressions.traverse(analyzeExpression) // .map(e => GroupByClause(e.map(_.value)))
             }
         types = analyzedProjections
                   .zipWithIndex
-                  .map { case (Projection(e, maybeAlias), index) =>
+                  .map { z =>
+                    val (Indexed(Projection(e, maybeAlias), _), _) = z._1
                     // TODO check that aliases are not repeated
-                    val name = maybeAlias.getOrElse(s"col_$index")
+                    val name = maybeAlias.getOrElse(s"col_${z._2}")
                     val expressionType: Type = e.unfix.expressionType match {
                       case t: SimpleType        => t
                       case t: ComplexType.Array => t
@@ -397,7 +490,7 @@ def analyzeStatement(
                   }
                   .toNem
       } yield Statement.SelectStatement(
-        analyzedProjections,
+        analyzedProjections.map(_._1.value),
         analyzedFrom,
         analyzedWhere,
         None,
