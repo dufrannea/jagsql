@@ -78,7 +78,7 @@ object ExpressionF {
     def foldRight[a, b](fa: ExpressionF[a], lb: cats.Eval[b])(f: (a, cats.Eval[b]) => cats.Eval[b]): cats.Eval[b] =
       fa match {
         case FunctionCallExpression(name, args, t) => args.foldRight(lb)(f)
-        case Binary(left, right, operator, t)      => f(right, f(left, lb))
+        case Binary(left, right, operator, t)      => f(left, Eval.defer(f(right, lb)))
         case Unary(e, t)                           => f(e, lb)
         case LiteralExpression(literal, t)         => lb
         case FieldRef(tableId, fieldId, t)         => lb
