@@ -25,33 +25,63 @@ class runnerSpec extends RunnerDsl {
   given lines: Stream[IO, String] =
     Stream.emits(sourceList)
 
+  val lines2: Stream[IO, String] =
+    Stream.emits(List("lol", "http", "lol"))
+
   val createdFilePath = {
     val file = Files.createTempFile("runnerSpecTest", "foo")
     Files.write(file, "foo".getBytes(StandardCharsets.UTF_8)).toAbsolutePath.toString
   }
 
-  "SELECT in.col_0 FROM STDIN" evalsTo (1, Vector(
+  "SELECT in.col_0 FROM STDIN" evalsTo Vector(
     Row(List(("col_0", Value.VString("lol")))),
     Row(List(("col_0", Value.VString("http"))))
-  ))
+  )
 
-  "SELECT in.col_0, out.foo AS col_1 FROM STDIN AS in JOIN (SELECT zitch.col_0 AS foo FROM STDIN AS zitch) AS out ON true" evalsTo (1000,
-  sourceList
+  "SELECT in.col_0, out.foo AS col_1 FROM STDIN AS in JOIN (SELECT zitch.col_0 AS foo FROM STDIN AS zitch) AS out ON true" evalsTo sourceList
     .flatMap(i => sourceList.map(j => i -> j))
     .map { case (i, j) =>
       val l = List(("col_0", Value.VString(i)), ("col_1", Value.VString(j)))
       Row(l)
     }
-    .toVector)
+    .toVector
 
-  s"SELECT in.col_0 FROM FILE('$createdFilePath') AS in" evalsTo (1, {
+  s"SELECT in.col_0 FROM FILE('$createdFilePath') AS in" evalsTo {
     val l = List(("col_0", Value.VString("foo")))
     Vector(Row(l))
-  })
+  }
 
-  "SELECT in.col_0 FROM STDIN AS in WHERE in.col_0 = 'lol'" evalsTo (1, Vector(
+  "SELECT in.col_0 FROM STDIN AS in WHERE in.col_0 = 'lol'" evalsTo Vector(
     Row(List(("col_0", Value.VString("lol"))))
-  ))
+  )
+
+  "SELECT in.col_0 FROM STDIN AS in GROUP BY in.col_0".evalsTo(
+    Vector(
+      Row(List(("col_0", Value.VString("lol")))),
+      Row(List(("col_0", Value.VString("http"))))
+    )
+  )(
+    using lines2
+  )
+
+  "SELECT max(to_int(on.col_0)) FROM STDIN AS on GROUP BY on.col_0".evalsTo(
+    Vector(
+      Row(List(("col_0", Value.VNumber(2)))),
+      Row(List(("col_0", Value.VNumber(1))))
+    )
+  )(
+    using Stream.emits(List("1", "2"))
+  )
+
+  "SELECT max(to_int(on.col_0)), to_int(on.col_0) FROM STDIN AS on GROUP BY on.col_0".evalsTo(
+    Vector(
+      Row(List(("col_0", Value.VNumber(2)), ("col_1", Value.VNumber(2)))),
+      Row(List(("col_0", Value.VNumber(1)), ("col_1", Value.VNumber(1))))
+    )
+  )(
+    using Stream.emits(List("1", "2"))
+  )
+
 }
 
 trait RunnerDsl extends AnyFreeSpec with Matchers {
@@ -91,6 +121,9 @@ trait RunnerDsl extends AnyFreeSpec with Matchers {
 
       evaluate(c, stdIn).map(v => require(v == expected))
     }
+
+    def evalsTo(expected: Vector[Row])(using stdIn: Stream[IO, String]): Unit =
+      evalsTo(1, expected)
 
     def evalsTo(iterations: Int, expected: Vector[Row])(using stdIn: Stream[IO, String]) = {
       import ast.*

@@ -158,16 +158,13 @@ def analyzeStatement(
     }
   }
 
-  def containsOnlyStaticOrGroupedByExpressions(
-    e: ast.Expression,
-    groupByExpressions: NonEmptySet[ast.Expression]
-  ): Boolean = ???
-
   /** Check that projections are valid with respect to group by expressions, that is to say they are either:
     *   - pure
     *   - aggregates of anything are ok as long as they do not contain aggregates themselves
     *   - non aggregates are okay only if composing grouped by expressions
     */
+  // TODO: rename to extract aggregates or something
+  // this need to be used in the Groupby clause
   def isValidWithRespectToGroupBy(
     e: ast.IndexedExpression,
     groupByExpressions: Set[ast.Expression]
@@ -243,32 +240,16 @@ def analyzeStatement(
                                       case Right(datasets) => None
                                     }
 
-                                  // val errors = analyzedProjections.collect {
-                                  //  case projection
-                                  //      if !allowedExpressions.contains(projection.e) && !isAggregateFunction(
-                                  //        projection.e
-                                  //      ) && !projection.e.unfix.isInstanceOf[ExpressionF.LiteralExpression[_]] =>
-                                  //    s"$projection should be part of GROUP BY expressions, a literal or an aggregate function"
-                                  // }
-                                  // if (errors.isEmpty)
-                                  //  None
-                                  // else
-                                  //  Some(errors.mkString(","))
                                   }
                                   .toLeft(())
                                   .liftTo[Verified]
         analyzedWhere        <-
           maybeWhere.traverse(where => analyzeExpression(where.value.expression).map(k => WhereClause(k.fix)))
-        maybeAnalyzedGroupBy <-
-          maybeGroupBy
-            .traverse { case groupBy =>
-              groupBy.value.expressions.traverse(analyzeExpression) // .map(e => GroupByClause(e.map(_.value)))
-            }
         types = analyzedProjections
                   .zipWithIndex
                   .map { z =>
                     val (Indexed(Projection(e, maybeAlias), _), _) = z._1
-                    // TODO check that aliases are not repeated
+                    // TODO: check that aliases are not repeated
                     val name = maybeAlias.getOrElse(s"col_${z._2}")
                     val expressionType: Type = e.unfix.expressionType match {
                       case t: SimpleType        => t
@@ -283,7 +264,7 @@ def analyzeStatement(
         analyzedProjections.map(_._1.value),
         analyzedFrom,
         analyzedWhere,
-        None,
+        maybeAnalyzedGroupBy,
         ComplexType.Table(types)
       )
   }

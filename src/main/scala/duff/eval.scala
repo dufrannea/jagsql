@@ -23,7 +23,7 @@ import duff.jagsql.eval.Value.*
 type ExpressionValue = Reader[Map[String, Value], Value]
 
 def alg(e: ExpressionF[ExpressionValue]): ExpressionValue = e match {
-  case ExpressionF.LiteralExpression(l, _)                       =>
+  case ExpressionF.LiteralExpression(l, _)                        =>
     val value = l match {
       case Literal.BoolLiteral(e)   => VBoolean(e)
       case Literal.StringLiteral(e) => VString(e)
@@ -31,7 +31,7 @@ def alg(e: ExpressionF[ExpressionValue]): ExpressionValue = e match {
       case Literal.RegexLiteral(e)  => Error
     }
     Kleisli(_ => value)
-  case ExpressionF.Binary(left, right, operator, commonType)     =>
+  case ExpressionF.Binary(left, right, operator, commonType)      =>
     val v = ((left, right)).tupled.map { case (l, r) => (l, r, operator) }.map {
       case (left, right, Operator.Equal)                => VBoolean(left == right)
       case (left, right, Operator.Different)            => VBoolean(left != right)
@@ -50,18 +50,25 @@ def alg(e: ExpressionF[ExpressionValue]): ExpressionValue = e match {
       case _                                            => Error
     }
     v
-  case ExpressionF.FunctionCallExpression(`array`, arguments, _) =>
+  case ExpressionF.FunctionCallExpression(`array`, arguments, _)  =>
     Kleisli { values =>
       val k = arguments.map { argument =>
         argument.run(values)
       }
       VArray(k.toList)
     }
-  case ExpressionF.FieldRef(tableId, fieldId, _)                 =>
+  case ExpressionF.FunctionCallExpression(`to_int`, arguments, _) =>
+    Kleisli { values =>
+      val stringVal = arguments.head.run(values)
+      VNumber(stringVal.asInstanceOf[Value.VString].e.toInt)
+    }
+  case ExpressionF.FunctionCallExpression(x, _, _)                =>
+    sys.error(s"Missing implementation for function $x")
+  case ExpressionF.FieldRef(tableId, fieldId, _)                  =>
     Kleisli { values =>
       values.get(fieldId).getOrElse(sys.error(s"Key not found $fieldId in ${values.toString}"))
     }
-  case _                                                         => ???
+  case _                                                          => ???
 }
 
 def eval(e: ast.Expression): ExpressionValue =

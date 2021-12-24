@@ -44,13 +44,13 @@ def toStream(s: Stage, stdInLines: Stream[IO, String] = defaultStdInLines): fs2.
 
   def toStream0(s: Stage, name: Option[String] = None): MaybeNeedsTopic[Stream[IO, Row]] =
     s match {
-      case Stage.ReadStdIn                                             =>
+      case Stage.ReadStdIn                                     =>
         Left(topic =>
           topic
             .subscribe(10)
             .unNoneTerminate
         )
-      case Stage.ReadFile(file)                                        =>
+      case Stage.ReadFile(file)                                =>
         Right(
           readInputStream[IO](IO(new FileInputStream(file)), 1024)
             .through(fs2.text.utf8Decode)
@@ -58,7 +58,7 @@ def toStream(s: Stage, stdInLines: Stream[IO, String] = defaultStdInLines): fs2.
             .dropLastIf(_.isEmpty)
             .map(line => Row(List(("col_0", Value.VString(line)))))
         )
-      case Stage.Projection(projections, source)                       =>
+      case Stage.Projection(projections, source)               =>
         val sourceStream = toStream0(source)
 
         // Need to explicit the types as we do not want
@@ -73,14 +73,14 @@ def toStream(s: Stage, stdInLines: Stream[IO, String] = defaultStdInLines): fs2.
 
           Row(colValues.toList)
         }.value
-      case Stage.Filter(predicate, source)                             =>
+      case Stage.Filter(predicate, source)                     =>
         val sourceStream = toStream0(source)
 
         Functor[MaybeNeedsTopic].map(sourceStream)(_.filter { case Row(inputColValues) =>
           val lookup = inputColValues.toMap
           unsafeEvalBool(predicate)(lookup)
         })
-      case Stage.Join(leftSource, rightSource, maybePredicate)         =>
+      case Stage.Join(leftSource, rightSource, maybePredicate) =>
         val leftStream = toStream0(leftSource, Some("left"))
         val rightStream = toStream0(rightSource, Some("right"))
 
@@ -105,7 +105,38 @@ def toStream(s: Stage, stdInLines: Stream[IO, String] = defaultStdInLines): fs2.
               filtered
           }
         }
-      case Stage.GroupBy(projections, groupings, aggregations, source) => ???
+      case Stage.GroupBy(groupings, aggregations, source)      =>
+        Functor[MaybeNeedsTopic].map(toStream0(source)) { s =>
+          val groupLines = s.compile.toList.map { (list: List[Row]) =>
+            val aggregatedRows = list
+              .groupMap { row =>
+                Row(groupings.map { case (grouping, groupingColName) =>
+                  groupingColName -> eval(grouping)(row.colValues.toMap)
+                }.toList)
+              }(identity)
+              .map { case (keysRow, aggregatedRows) =>
+                val aggregatedValues = aggregations.map { case (aggExpression, aggName) =>
+                  val ast.ExpressionF.FunctionCallExpression(aggregateFunction, args, _) =
+                    aggExpression.unfix.asInstanceOf[ast.ExpressionF.FunctionCallExpression[ast.Expression]]
+                  val argExpression = args.head
+                  val toBeAggregated: List[Value] =
+                    aggregatedRows.map(_.colValues.toMap ++ keysRow.colValues.toMap).map { scope =>
+                      eval(argExpression)(scope)
+                    }
+                  val aggregateValue = aggregateFunction.asInstanceOf[ast.AggregateFunction].run(toBeAggregated)
+                  aggName -> aggregateValue
+                }
+
+                Row(keysRow.colValues ++ aggregatedValues)
+              }
+
+            aggregatedRows.toSeq
+          }
+
+          Stream.evalSeq(groupLines)
+
+        }
+
     }
 
   toStream0(s) match {

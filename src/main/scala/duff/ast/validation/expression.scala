@@ -133,7 +133,7 @@ def analyzeExpression(
                 TrackedError(
                   e.pos,
                   s"Error in function $name, argument with type ${analyzedExpression.expressionType}" +
-                    " expected to have type $expectedArgType"
+                    s" expected to have type $expectedArgType"
                 ).asLeft
             }
           }

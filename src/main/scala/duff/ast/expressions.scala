@@ -3,6 +3,7 @@ package ast
 
 import duff.jagsql.ast.ExpressionF.{Binary, FieldRef, FunctionCallExpression, LiteralExpression, Unary}
 import duff.jagsql.cst.{Indexed, Operator, Position}
+import duff.jagsql.eval.Value
 import duff.jagsql.std.*
 
 import scala.language.experimental
@@ -16,10 +17,11 @@ object Function {
 
   def valueOf(s: String): Function =
     s match {
-      case "file"  => file
-      case "array" => array
-      case "max"   => max
-      case _       => throw new IllegalArgumentException(s"No Function named $s")
+      case "file"   => file
+      case "array"  => array
+      case "max"    => max
+      case "to_int" => to_int
+      case _        => throw new IllegalArgumentException(s"No Function named $s")
     }
 
 }
@@ -42,14 +44,31 @@ case object array extends Function {
   override val maybeVariadic: Option[Type] = Some(Type.Number)
 }
 
+case object to_int extends Function {
+  val args = Type.String :: Nil
+  val returnType = Type.Number
+  override val maybeVariadic: Option[Type] = None
+}
+
 // TODO: AggregationFunction takes only one argument ?
 sealed trait AggregateFunction(
   val args: List[Type],
   val returnType: Type,
   override val maybeVariadic: Option[Type] = None
-) extends Function
+) extends Function {
 
-case object max extends AggregateFunction(Type.Number :: Nil, Type.Number)
+  def run(values: List[eval.Value]): Value
+}
+
+case object max extends AggregateFunction(Type.Number :: Nil, Type.Number) {
+
+  def run(values: List[eval.Value]): Value =
+    values.maxBy {
+      case eval.Value.VNumber(n) => n
+      case value                 => sys.error(s"Value is not a number $value, function 'max' only work for numbers")
+    }
+
+}
 
 enum ExpressionF[K] {
 
