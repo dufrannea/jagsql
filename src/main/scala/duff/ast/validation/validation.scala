@@ -59,6 +59,12 @@ def analyzeStatement(
           source <- Source.StdIn(alias).asRight.liftTo[Verified]
           _      <- Verified.set(state + (alias -> source.tableType))
         } yield source
+      case cst.Source.Dual(Indexed(alias, _))                            =>
+        for {
+          state  <- Verified.read
+          source <- Source.Dual(alias).asRight.liftTo[Verified]
+          _      <- Verified.set(state + (alias -> source.tableType))
+        } yield source
       case cst.Source.TableRef(Indexed(id, tablePos), Indexed(alias, _)) =>
         for {
           ref    <- Verified.read

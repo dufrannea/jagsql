@@ -24,6 +24,10 @@ object Source {
     def tableType = stdinType
   }
 
+  case class Dual(alias: String) extends Source {
+    def tableType = stdinType
+  }
+
   case class TableRef(name: String, tableType: ComplexType.Table) extends Source
 
   case class SubQuery(statement: Statement.SelectStatement, alias: String) extends Source {

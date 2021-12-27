@@ -73,10 +73,9 @@ class runnerSpec extends RunnerDsl {
     using Stream.emits(List("1", "2"))
   )
 
-  "SELECT max(to_int(on.col_0)), to_int(on.col_0) FROM STDIN AS on GROUP BY on.col_0".evalsTo(
+  "SELECT on.col_0 FROM DUAL AS on".evalsTo(
     Vector(
-      Row(List(("col_0", Value.VNumber(2)), ("col_1", Value.VNumber(2)))),
-      Row(List(("col_0", Value.VNumber(1)), ("col_1", Value.VNumber(1))))
+      Row(List(("col_0", Value.VString(""))))
     )
   )(
     using Stream.emits(List("1", "2"))

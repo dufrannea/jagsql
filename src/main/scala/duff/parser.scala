@@ -68,6 +68,7 @@ object parser {
   val WHERE: IndexedParser[Keyword] = keyword("WHERE")
   val JOIN: IndexedParser[Keyword] = keyword("JOIN")
   val STDIN = keyword("STDIN")
+  val DUAL = keyword("DUAL")
 
   val ON = keyword("ON")
 
@@ -307,8 +308,10 @@ object parser {
         // Tableref is for when CTE will be supported, currently there is no way to
         // refer to a subquery in another join clause
         // TODO: aliasing should not be handled in the parser
-        Functor[IndexedParser].map(maybeAliased(STDIN)) { case (stdin, alias) =>
-          Source.StdIn(alias.getOrElse(Indexed("in", Position.empty)))
+        Functor[IndexedParser].map(maybeAliased(STDIN | DUAL)) {
+          case (Indexed(Keyword("STDIN"), pos), alias) => Source.StdIn(alias.getOrElse(Indexed("in", pos)))
+          case (Indexed(Keyword("DUAL"), pos), alias)  => Source.Dual(alias.getOrElse(Indexed("in", pos)))
+          case _                                       => sys.error("Non supported source")
         }
           | Functor[IndexedParser].map(maybeAliased(compositeIdentifier)) { case (tableRef, alias) =>
             Source.TableRef(tableRef, alias.getOrElse(tableRef))

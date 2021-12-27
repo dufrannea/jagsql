@@ -50,6 +50,10 @@ def toStream(s: Stage, stdInLines: Stream[IO, String] = defaultStdInLines): fs2.
             .subscribe(10)
             .unNoneTerminate
         )
+      case Stage.ReadDual                                      =>
+        Right(
+          Stream.emits(List(Row(("col_0" -> Value.VString("")) :: Nil))).covary[IO]
+        )
       case Stage.ReadFile(file)                                =>
         Right(
           readInputStream[IO](IO(new FileInputStream(file)), 1024)

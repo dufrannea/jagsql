@@ -57,3 +57,18 @@ TODO:
 THOUGHTS:
 - recursive CTE support ?
 - windows (tumble, etc.)
+
+```sql
+DESC file'/some/file'
+
+can understand file format and make it usable as a table
+
+SHOW TABLES
+-- populated with many tables 
+CREATE TABLE processes (
+    pid NUMBER
+    owner STRING
+    open_files ARRAY[STRING],
+    open_ports ARRAY[NUMBER]
+)
+```

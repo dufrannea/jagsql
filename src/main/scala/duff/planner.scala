@@ -78,6 +78,7 @@ def r3(
 
 enum Stage {
   case ReadStdIn
+  case ReadDual
   case ReadFile(file: String)
   case Join(left: Stage, right: Stage, predicate: Option[Expression])
   case Projection(projections: NonEmptyList[ast.Projection], source: Stage)
@@ -93,10 +94,11 @@ enum Stage {
 
 def toStage(source: ast.Source): Stage = source match {
   case Source.StdIn(_)                              => Stage.ReadStdIn
+  case Source.Dual(_)                               => Stage.ReadDual
   case Source.SubQuery(statement, _)                => toStage(statement)
   case Source.TableRef(_, _)                        => sys.error("TableRef not supported")
   case Source.TableFunction("FILE", path :: Nil, _) => Stage.ReadFile(path.asInstanceOf[cst.Literal.StringLiteral].a)
-  case _                                            => sys.error("Stage not implemented")
+  case other @ Source.TableFunction(_, _, _)        => sys.error(s"Stage not implemented $other")
 }
 
 def toStage(fromClause: ast.FromClause): Stage =

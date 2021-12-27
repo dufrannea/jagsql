@@ -122,6 +122,7 @@ case class Aliased[T](source: T, alias: Option[String])
 
 enum Source[F[_]] {
   case StdIn(alias: F[String])
+  case Dual(alias: F[String])
   case TableRef(identifier: F[String], alias: F[String])
   case SubQuery(statement: F[Statement.SelectStatement[F]], alias: F[String])
   case TableFunction(name: F[String], arguments: List[F[Literal]], alias: F[String])
@@ -135,6 +136,7 @@ object Source {
     def mapK[F[_]: Functor, G[_]](g: F ~> G)(s: Source[F]): Source[G] =
       s match {
         case in: StdIn[F]          => StdIn(g(in.alias))
+        case in: Dual[F]           => Dual(g(in.alias))
         case ref: TableRef[F]      => TableRef(g(ref.identifier), g(ref.alias))
         case subQuery: SubQuery[F] =>
           SubQuery(subQuery.statement.emap(g), g(subQuery.alias))
