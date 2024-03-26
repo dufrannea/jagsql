@@ -1,0 +1,9 @@
+target/
+.bloop
+.metals
+.vscode
+*.jar
+.bsp
+.idea
+metals.sbt
+.gradle
